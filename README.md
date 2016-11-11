@@ -1,5 +1,5 @@
 # KINC.R
-![alt tag](KINClogo.png =150x)
+![alt tag](/KINClogo.png =150x)
 
 ##Installation
 * Clone this repository. 
