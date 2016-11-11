@@ -1,4 +1,6 @@
 # KINC.R
+![alt tag](https://raw.githubusercontent.com/SystemsGenetics/KINC/version1/KINClogo.png)
+
 ##Installation
 * Clone this repository. 
 * Start R inside of the clonde directory
