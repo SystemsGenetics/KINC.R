@@ -1,5 +1,5 @@
 # KINC.R
-![alt tag](/KINClogo.png =150x)
+![KINC logo](https://raw.githubusercontent.com/SystemsGenetics/KINC.R/master/KINClogo.png =150x)
 
 ##Installation
 * Clone this repository. 
