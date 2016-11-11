@@ -4,10 +4,10 @@ The KINC.R package provides supplementary R functions to assist with analysis of
 
 ##Installation
 * Clone this repository. 
-* Start R inside of the clonde directory
-* load the devtools library:   library('devtools')
+* Start R inside of the cloned directory
+* Load the devtools library:   library('devtools')
 * Install the package:   install()
-* Now you can use KINC.R by importing the library:  library('KINC.R')
+* Now you can use KINC.R in an new session of R by importing the library:  library('KINC.R')
 
 ## Examples
 While KINC has been written for gene co-expression networks, the RMT function can be used with any similarity matrix.  The matrix must be in a data frame with at least three columns named: Source, Target and Similarity.  The Source and Target columns indicate the edge in the network adn the Similarity contains the similarity score.  The RMT() function will perform RMT analysis on a similarity matrix that it constructs from the network file.  
