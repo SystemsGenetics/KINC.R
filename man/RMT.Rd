@@ -53,4 +53,3 @@ similarity submatrix appears Poisson.
 \examples{
   
 }
-
