@@ -19,6 +19,7 @@ library(digest)
 #' @return
 #'   A data frame containing the annotations in the order of the samples.
 #'
+#' @export
 loadSampleAnnotations = function (annotation_file, sample_order) {
   sample_annots = read.table(annotation_file, sep="\t")
   sample_order = read.table(sample_order, colClasses=c('character'), 
@@ -44,6 +45,8 @@ loadSampleAnnotations = function (annotation_file, sample_order) {
 #' @return
 #'    An object of class hclust which describes the tree produced by the 
 #'    clustering process. 
+#'
+#' @export
 clusterEdges = function(net, distMethod = "manhattan", hclustMethod = "ward.D2") {
 
   # Convert the samples strings into a matrix.

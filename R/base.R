@@ -5,7 +5,8 @@
 #'
 #' @return
 #'    A dataframe containing the network file contents
-#
+#' 
+#' @export
 loadNetwork = function(network_file) {
   # Load in the KINC network file
   colNames = c(
