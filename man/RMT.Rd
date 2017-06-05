@@ -8,10 +8,8 @@ RMT(net, start = 0.99, end = 0.75, step = -0.001, min.eigens = 100,
   save.plot = FALSE)
 }
 \arguments{
-\item{net}{A network-style representation of the similarity matrix. This is a 
-data.frame that must have a column named 'Source', another named 
-'Target' and a third named 'Similarity'.  Any other columns are allowed
-but ignored.}
+\item{net}{A network dataframe containing the KINC-produced network.  The loadNetwork
+function imports a dataframe in the correct format for this function.}
 
 \item{start}{The similarity score at which to start RMT analysis. The RMT will 
 iterate through successively lower similarity scores. By default

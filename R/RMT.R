@@ -17,10 +17,8 @@
 #'
 #' 
 #' @param net
-#'   A network-style representation of the similarity matrix. This is a 
-#'   data.frame that must have a column named 'Source', another named 
-#'   'Target' and a third named 'Similarity'.  Any other columns are allowed
-#'   but ignored.
+#'   A network dataframe containing the KINC-produced network.  The loadNetwork
+#'   function imports a dataframe in the correct format for this function.
 #' @param start
 #'   The similarity score at which to start RMT analysis. The RMT will 
 #'   iterate through successively lower similarity scores. By default
