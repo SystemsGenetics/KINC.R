@@ -312,7 +312,7 @@ analyzeEdgeTree = function(tree, osa, net, fields, alpha = 0.001, min_presence =
                  append = TRUE
                )
              #} # end if(length(which(enrichment….
-              } # end for (field in fields)
+           } # end for (field in fields)
         } # end if (length(cluster_indexes
         else {
           print("Skipping, cluster too small")
