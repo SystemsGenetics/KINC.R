@@ -21,7 +21,7 @@ library(digest)
 #'
 #' @export
 loadSampleAnnotations = function (annotation_file, sample_order) {
-  sample_annots = read.table(annotation_file, sep="\t")
+  sample_annots = read.table(annotation_file, sep="\t", header=TRUE, row.names=NULL)
   sample_order = read.table(sample_order, colClasses=c('character'), 
     col.names=c('Sample'))
   osa = merge(sample_order, sample_annots, by = "Sample", sort=FALSE)
