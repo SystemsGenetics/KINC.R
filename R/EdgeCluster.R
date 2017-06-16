@@ -66,7 +66,33 @@ clusterEdges = function(net, distMethod = "manhattan", hclustMethod = "ward.D2")
   
   return(tree)
 }
- 
+
+#' Generates a matrix containing edge sample strings digits.
+#' 
+#' The returned matrix contains as many rows as there are edges
+#' in the network and as many columns as their are samples. Each
+#' column corresponds to a sample in the same order as the
+#' sample strings from the network.
+#'
+#' @param net
+#'   A network data frame containing the KINC-produced network.  The loadNetwork
+#'   function imports a dataframe in the correct format for this function.
+#' @return
+#'   A matrix 
+getSampleMatrix = function(net) {
+  # Convert the samples strings into a matrix.
+  num_samples = nchar(net$Samples[1])
+  sample_strs = net$Samples
+  samples = sapply(sample_strs, FUN=function(x) {
+    s = as.numeric(strsplit(x, "")[[1]])
+    s[which(s != 1)] = 0
+    return(s)
+  })
+  colnames(samples) = c()
+  samples = t(samples)
+
+  return(samples)
+}
 #' Performs a fisher's exact test on a sample.
 #'
 #' The sample annotation matrix consists of multiple columns of annotation
@@ -166,37 +192,45 @@ test_module = function(net, edge_indexes, osa, field, min_presence = 0.95) {
  
 #' Draws a heatmap with dendrogram with clusters identified.
 #'
-#' @param osa
-#' 
+#' @param sampleMatrix
 #' @param tree
-#' @param height
-#' @param samples
-#' @param depth
-#' @param field
-#' @param tOrder
-drawNetDendro = function(osa, tree, height, samples, depth, field, tOrder) {
+#'   An instance of an hclust object.
+#' @param osa
+#'   The sample annotation matrix. One column must contain the header 'Sample'
+#'   and the remaining colums correspond to an annotation type.  The rows
+#'   of the anntation columns should contain the annotations.
+#' @param num_clusters
+#'   The number of row clusters to draw on the sidebar.
+#' @param fieldOrder
+#'   A vector containing a list of column names from the osa
+#'   data frame for sorting the samples. To maintain the default
+#'   sample ordering provide a vecotr with a single element named 
+#'   'Sample'.
+drawNetHeatMap = function(sampleMatrix, tree, osa, num_clusters, fieldOrder) {
+
+  # Reorder samples according to the fieldOrder argument.
+  sample_order = eval(parse(text=paste('order(osa$', paste(fieldOrder, collapse=' ,osa$'), ")", sep="")))
+  sampleMatrix2 = sampleMatrix[, c(sample_order)]
  
-  members = cutree(tree, h = height)
- 
-  num_categories = length(unique(osa[, c(field)]))
-  num_clusters = length(unique(members))
-  #tOrder = order(osa[, c(field)])
-  samples2 = samples[,tOrder]
+  members = cutree(tree, k = num_clusters)
+
+  categories = do.call(paste, c(osa[, fieldOrder], sep="-"))
+  num_categories = length(unique(categories))
+  osa$hmap_categories = categories
   tColors = data.frame(
-    Field = unique(osa[, c(field)]), 
+    Field = unique(categories),
     Color = rgb(runif(num_categories), runif(num_categories), runif(num_categories))
   )
   mColors = data.frame(
     Cluster = unique(members),
     color = rgb(runif(num_clusters), runif(num_clusters), runif(num_clusters))
   )
-  colColors = as.character(merge(osa, tColors, by.x=field, by.y="Field",    
-    sort=FALSE)$Color)
+  colColors = as.character(merge(osa, tColors, by.x="hmap_categories", by.y="Field", sort=FALSE)$Color)
   rowColors = as.character(factor(members, labels=mColors$color))
  
-  png(filename=paste("heatmap","-", field, "-", depth, ".png", sep=""), 
+  png(filename=paste("heatmap", paste(fieldOrder, collapse="-"), num_clusters, "png", sep="."), 
     width=3000, height=21000, res=300)
-  heatmap.2(samples2, Rowv=as.dendrogram(tree), Colv=FALSE, dendrogram = 'row', 
+  heatmap.2(sampleMatrix2, Rowv=as.dendrogram(tree), Colv=FALSE, dendrogram = 'row', 
     col = c("red", "green"), 
     breaks = c(-1, 0, 1), 
     trace = 'none', 
@@ -258,64 +292,64 @@ analyzeEdgeTree = function(tree, osa, net, fields, alpha = 0.001, min_presence =
   
     prev_indexes[[depth]] = list() 
     for(i in unique(members)) {
-       print(paste("Depth: ", depth, ", Num Clusters: ", num_clusters, ", Cluster: ", i, sep=""))
+      print(paste("Depth: ", depth, ", Num Clusters: ", num_clusters, ", Cluster: ", i, sep=""))
  
       cluster_indexes = as.integer(which(members == i))   
       clust_chksm = digest(cluster_indexes)
-  		prev_indexes[[depth]][[clust_chksm]] = cluster_indexes
+      prev_indexes[[depth]][[clust_chksm]] = cluster_indexes
  
       # if the checksum of the cluster index array is not in seen_checksums
       if (!is.element(clust_chksm, seen_checksums)) {
  
-          # Add it to seen checksums
-          seen_checksums = c(seen_checksums, clust_chksm)
+        # Add it to seen checksums
+        seen_checksums = c(seen_checksums, clust_chksm)
  
-					# Find the parent
-					parent = NA
-					if (depth > 1) {
-						for (pchksm in names(prev_indexes[[depth-1]])) {
-						  if (all(cluster_indexes %in% prev_indexes[[depth-1]][[pchksm]])) {
-						    parent = pchksm
-						  }
-						}
-					}
+        # Find the parent
+        parent = NA
+        if (depth > 1) {
+          for (pchksm in names(prev_indexes[[depth-1]])) {
+            if (all(cluster_indexes %in% prev_indexes[[depth-1]][[pchksm]])) {
+                parent = pchksm
+            }
+          }
+        }
  
-         # Calculate the average degree
-         cluster_nodes = unique(c(
-           net[which(members == i), c('Source')], 
-           net[which(members == i), c('Target')]
-         ))
-         avg_degree = (length(which(members == i)) * 2) / length(cluster_nodes)
+        # Calculate the average degree
+        cluster_nodes = unique(c(
+          net[which(members == i), c('Source')], 
+          net[which(members == i), c('Target')]
+        ))
+        avg_degree = (length(which(members == i)) * 2) / length(cluster_nodes)
  
-         # Run enrichment
-         if (length(cluster_indexes) >= min_cluster_size) {
-           for (field in fields) {
-             results = test_module(net, cluster_indexes, osa, field, min_presence)
-             enrichment = results[[1]]
-             counts = results[[2]]
-             #if (length(which(enrichment < alpha)) > 0) {
+        # Run enrichment
+        if (length(cluster_indexes) >= min_cluster_size) {
+          for (field in fields) {
+            results = test_module(net, cluster_indexes, osa, field, min_presence)
+            enrichment = results[[1]]
+            counts = results[[2]]
+            #if (length(which(enrichment < alpha)) > 0) {
               write(
-                 paste(
-                   clust_chksm,
-                   parent,
-                   depth,
-                   height,
-                   num_clusters,
-                   i,
-                   length(cluster_indexes),
-               avg_degree,
-                   field,
-                   paste(counts, collapse=","),
-                   paste(unique(osa[,c(field)]), collapse=","),
-                   paste(enrichment, collapse=","), 
-                   paste(cluster_nodes, collapse=","), 
-                   paste(cluster_indexes, collapse=","),
-                   sep="\t"),
-                  file = output, 
-                 append = TRUE
-               )
-             #} # end if(length(which(enrichment….
-           } # end for (field in fields)
+                paste(
+                  clust_chksm,
+                  parent,
+                  depth,
+                  height,
+                  num_clusters,
+                  i,
+                  length(cluster_indexes),
+                  avg_degree,
+                  field,
+                  paste(counts, collapse=","),
+                  paste(unique(osa[,c(field)]), collapse=","),
+                  paste(enrichment, collapse=","), 
+                  paste(cluster_nodes, collapse=","), 
+                  paste(cluster_indexes, collapse=","),
+                  sep="\t"),
+                file = output, 
+                append = TRUE
+              )
+            #} # end if(length(which(enrichment….
+          } # end for (field in fields)
         } # end if (length(cluster_indexes
         else {
           print("Skipping, cluster too small")
