@@ -3,5 +3,6 @@
 export(RMT)
 export(analyzeEdgeTree)
 export(clusterEdges)
+export(getSampleMatrix)
 export(loadNetwork)
 export(loadSampleAnnotations)

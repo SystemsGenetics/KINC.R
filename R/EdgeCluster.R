@@ -79,6 +79,8 @@ clusterEdges = function(net, distMethod = "manhattan", hclustMethod = "ward.D2")
 #'   function imports a dataframe in the correct format for this function.
 #' @return
 #'   A matrix 
+#'
+#' @export
 getSampleMatrix = function(net) {
   # Convert the samples strings into a matrix.
   num_samples = nchar(net$Samples[1])
