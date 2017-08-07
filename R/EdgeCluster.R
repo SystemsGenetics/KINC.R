@@ -235,7 +235,7 @@ drawNetDendro = function(osa, tree, height, samples, depth, field, tOrder) {
 #' @examples
 #'   
 analyzeEdgeTree = function(tree, osa, net, fields, alpha = 0.001, min_presence = 0.80,
-  min_cluster_size = 3) {
+  min_cluster_size = 3, outfile) {
   height_array = unique(tree$height)
   height_array = sort(height_array, decreasing = TRUE)
   seen = list()
@@ -246,7 +246,7 @@ analyzeEdgeTree = function(tree, osa, net, fields, alpha = 0.001, min_presence =
  
   # Iterate through the dendrogram at increasing heights and perform
   # enrichment analysis
-  output = file("output.txt", "w")
+  output = file(outfile, "w")
   write(paste("Cluster_ID", "Parent_ID", "Depth", "Height", "Clusters", "Cluster_Num", "Size", 
     "Avg Degree", "Type", "Counts", "Categories", "Enrichment", "Nodes", "Edge Index", 
     sep="\t"), file=output, append=TRUE)
