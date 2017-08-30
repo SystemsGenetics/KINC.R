@@ -195,19 +195,18 @@ test_module = function(net, edge_indexes, osa, field, min_presence = 0.95) {
 #' Draws a heatmap with dendrogram with clusters identified.
 #'
 #' @param sampleMatrix
+#'   The sample matrix as created by the getSampleMatrix() function.
 #' @param tree
-#'   An instance of an hclust object.
+#'   An instance of an hclust object as created by the clusterEdges() function.
 #' @param osa
-#'   The sample annotation matrix. One column must contain the header 'Sample'
-#'   and the remaining colums correspond to an annotation type.  The rows
-#'   of the anntation columns should contain the annotations.
+#'   The sample annotation matrix as created by the loadSampleAnnotations()
+#'   function.
 #' @param num_clusters
-#'   The number of row clusters to draw on the sidebar.
+#'   The number of edge clusters to draw on the sidebar.
 #' @param fieldOrder
-#'   A vector containing a list of column names from the osa
-#'   data frame for sorting the samples. To maintain the default
-#'   sample ordering provide a vecotr with a single element named 
-#'   'Sample'.
+#'   The name of the field to reorder samples.  
+#'
+#' @export
 drawNetHeatMap = function(sampleMatrix, tree, osa, num_clusters, fieldOrder) {
 
   # Reorder samples according to the fieldOrder argument.
@@ -266,12 +265,18 @@ drawNetHeatMap = function(sampleMatrix, tree, osa, num_clusters, fieldOrder) {
 #'   For enrichment testing the alpha value used for significance.
 #' @param min_presence
 #'   For a sample to be counted as being present in a cluster it must
-#'   be present in a minimum percentage of edges.  
+#'   be present in a minimum percentage of edges
+#' @param min_cluster_size
+#'   The minimum number of network edges that must be present in a cluster
+#'   In order for that cluster to be analyzed.
+#' @param outfile
+#'   The name of the file where output results are stored.  
 #' @export
 #' @examples
 #'   
 analyzeEdgeTree = function(tree, osa, net, fields, alpha = 0.001, min_presence = 0.80,
-  min_cluster_size = 3, outfile) {
+  min_cluster_size = 3, outfile = 'output.scc.txt') {
+  
   height_array = unique(tree$height)
   height_array = sort(height_array, decreasing = TRUE)
   seen = list()
