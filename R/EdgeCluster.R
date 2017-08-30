@@ -204,8 +204,10 @@ test_module = function(net, edge_indexes, osa, field, min_presence = 0.95) {
 #' @param num_clusters
 #'   The number of edge clusters to draw on the sidebar.
 #' @param fieldOrder
-#'   The name of the field to reorder samples.  
-#'
+#'   A vector containing a list of sample attribute names for reordering of
+#'   of the samples. Each element of this vector should be the name of 
+#'   a column in the osa matrix.  The sorting occurs first by the first
+#'   element, then by the second, etc.
 #' @export
 drawNetHeatMap = function(sampleMatrix, tree, osa, num_clusters, fieldOrder) {
 
