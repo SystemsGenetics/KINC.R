@@ -3,9 +3,9 @@ library(plotrix)
 library(digest)
 
 #' Imports sample annotations.
-#' 
+#'
 #' The format of the sample annotation file is tab delimited where the
-#' first column is the sample name and every other column contains 
+#' first column is the sample name and every other column contains
 #' the annotation.  The file must contain a header with the annotation
 #' types.
 #'
@@ -15,24 +15,24 @@ library(digest)
 #'   A file containing the order of samples in the sample strings of
 #'   the network.  The file should contain the list of samples each on
 #'   a separate line.
-#' 
+#'
 #' @return
 #'   A data frame containing the annotations in the order of the samples.
 #'
 #' @export
 loadSampleAnnotations = function (annotation_file, sample_order) {
   sample_annots = read.table(annotation_file, sep="\t", header=TRUE, row.names=NULL)
-  sample_order = read.table(sample_order, colClasses=c('character'), 
+  sample_order = read.table(sample_order, colClasses=c('character'),
     col.names=c('Sample'))
   osa = merge(sample_order, sample_annots, by = "Sample", sort=FALSE)
-  
+
   return(osa)
 }
 
 #' Perfoms clustering of edges in a network based on their sample compositions.
 #'
 #' This function uses the dist function to calucate a distance and the
-#' hclust function to generate the dendrogram. 
+#' hclust function to generate the dendrogram.
 #'
 #' @param net
 #'   A network data frame containing the KINC-produced network.  The loadNetwork
@@ -43,8 +43,8 @@ loadSampleAnnotations = function (annotation_file, sample_order) {
 #'   The method to be provided to the hclust method.
 #'
 #' @return
-#'    An object of class hclust which describes the tree produced by the 
-#'    clustering process. 
+#'    An object of class hclust which describes the tree produced by the
+#'    clustering process.
 #'
 #' @export
 clusterEdges = function(net, distMethod = "manhattan", hclustMethod = "ward.D2") {
@@ -63,12 +63,12 @@ clusterEdges = function(net, distMethod = "manhattan", hclustMethod = "ward.D2")
   # Perform clustering on the sample tree
   sample_dist  = dist(samples, method = distMethod)
   tree = hclust(sample_dist, method = hclustMethod)
-  
+
   return(tree)
 }
 
 #' Generates a matrix containing edge sample strings digits.
-#' 
+#'
 #' The returned matrix contains as many rows as there are edges
 #' in the network and as many columns as their are samples. Each
 #' column corresponds to a sample in the same order as the
@@ -78,7 +78,7 @@ clusterEdges = function(net, distMethod = "manhattan", hclustMethod = "ward.D2")
 #'   A network data frame containing the KINC-produced network.  The loadNetwork
 #'   function imports a dataframe in the correct format for this function.
 #' @return
-#'   A matrix 
+#'   A matrix
 #'
 #' @export
 getSampleMatrix = function(net) {
@@ -100,12 +100,12 @@ getSampleMatrix = function(net) {
 #' The sample annotation matrix consists of multiple columns of annotation
 #' types (or fields).  Each annotation type may have multiple distinct
 #' values. For example the type may be 'sex' and the categories may be
-#' 'male' and 'female'.  This function performs a Fisher's test on 
-#' a single category amongst all the other categories within the annotation 
+#' 'male' and 'female'.  This function performs a Fisher's test on
+#' a single category amongst all the other categories within the annotation
 #' type.
 #'
 #' @param category
-#'   The annotation category. 
+#'   The annotation category.
 #' @param sample_types
 #'   The ordered array of annotations for all samples (i.e. a full column
 #'   of the sample annotation matrix).
@@ -113,7 +113,7 @@ getSampleMatrix = function(net) {
 #'   An array of samples that represent the edge cluster being tested.
 fishers_test = function(category, sample_types, rep_samples) {
   #  Contingency matrix for each category  in a module:
-  #       
+  #
   #                   Is Type  Not Type Totals
   #                  ------------------
   #  Module          |  n11   |   n12   | n1p
@@ -128,7 +128,7 @@ fishers_test = function(category, sample_types, rep_samples) {
   n21 = np1 - n11
   n12 = n1p - n11
   n22 = np2 - n12
- 
+
   contmatrix = matrix(
     as.numeric(c(n11, n12, n21, n22)),
     nr=2,
@@ -141,8 +141,8 @@ fishers_test = function(category, sample_types, rep_samples) {
   res = fisher.test(contmatrix, alternative="greater")
   return(res$p.value)
 } # end fisher’s test function
- 
-#' 
+
+#'
 #' @param net
 #    The network
 #' @edge_indexes:  the index of the edges in the network that comprise the module.
@@ -151,16 +151,16 @@ fishers_test = function(category, sample_types, rep_samples) {
 #' @min_presence: the percentage of edges in the module for which a sample
 #'   must be present in order to be counted.
 test_module = function(net, edge_indexes, osa, field, min_presence = 0.95) {
- 
+
   sample_types = as.character(osa[[field]])
   sample_types[which(sample_types == "null")] = NA
   sample_types[which(sample_types == "notreported")] = NA
   num_samples = length(sample_types)
- 
+
   sample_types.prob = table(sample_types) / num_samples
   nona.idx = which(!is.na(sample_types))
   categories = sort(unique(sample_types[nona.idx]))
- 
+
   # Calculate the relative frequency of each sample in the module.
   mod_edges = net[edge_indexes,]
   num_edges = nrow(mod_edges)
@@ -172,7 +172,7 @@ test_module = function(net, edge_indexes, osa, field, min_presence = 0.95) {
     mod_ref = mod_ref + samples
   }
   mod_ref = mod_ref / num_edges
- 
+
   # Get the list of samples that are present > min_presence% in the module.
   rep_samples = which(mod_ref >= min_presence)
   num_rep_samples = length(rep_samples)
@@ -181,17 +181,17 @@ test_module = function(net, edge_indexes, osa, field, min_presence = 0.95) {
     names(results) = categories
     return(results)
   }
- 
+
   # get the frequencies of each category.
   rep_sample_types = as.character(na.omit(sample_types[rep_samples]))
   mod.freq = table(rep_sample_types)
-  #print(mod.freq)  
- 
+  #print(mod.freq)
+
   results = sapply(categories, fishers_test, sample_types, rep_samples)
   names(results) = categories
   return(list(results, table(rep_sample_types)))
 }
- 
+
 #' Draws a heatmap with dendrogram with clusters identified.
 #'
 #' @param sampleMatrix
@@ -205,19 +205,21 @@ test_module = function(net, edge_indexes, osa, field, min_presence = 0.95) {
 #'   The number of edge clusters to draw on the sidebar.
 #' @param fieldOrder
 #'   A vector containing a list of sample attribute names for reordering of
-#'   of the samples. Each element of this vector should be the name of 
+#'   of the samples. Each element of this vector should be the name of
 #'   a column in the osa matrix.  The sorting occurs first by the first
 #'   element, then by the second, etc.
+#' @param outfile_prefix
+#'   A prefix to add to the beginnging of the output heatmap image file.
 #' @export
-drawNetHeatMap = function(sampleMatrix, tree, osa, num_clusters, fieldOrder) {
+drawNetHeatMap = function(sampleMatrix, tree, osa, num_clusters, fieldOrder, outfile_prefix = 'heatmap') {
 
   # Reorder samples according to the fieldOrder argument.
   sample_order = eval(parse(text=paste('order(osa$', paste(fieldOrder, collapse=' ,osa$'), ")", sep="")))
   sampleMatrix2 = sampleMatrix[, c(sample_order)]
- 
+
   members = cutree(tree, k = num_clusters)
 
-  categories = do.call(paste, c(osa[, fieldOrder], sep="-"))
+  categories = do.call(paste, list(c(osa[, fieldOrder]), sep="-"))
   num_categories = length(unique(categories))
   osa$hmap_categories = categories
   tColors = data.frame(
@@ -230,14 +232,14 @@ drawNetHeatMap = function(sampleMatrix, tree, osa, num_clusters, fieldOrder) {
   )
   colColors = as.character(merge(osa, tColors, by.x="hmap_categories", by.y="Field", sort=FALSE)$Color)
   rowColors = as.character(factor(members, labels=mColors$color))
- 
-  png(filename=paste("heatmap", paste(fieldOrder, collapse="-"), num_clusters, "png", sep="."), 
+
+  png(filename=paste(outfile_prefix, paste(fieldOrder, collapse="-"), num_clusters, "png", sep="."),
     width=3000, height=21000, res=300)
-  heatmap.2(sampleMatrix2, Rowv=as.dendrogram(tree), Colv=FALSE, dendrogram = 'row', 
-    col = c("red", "green"), 
-    breaks = c(-1, 0, 1), 
-    trace = 'none', 
-    key = FALSE, 
+  heatmap.2(sampleMatrix2, Rowv=as.dendrogram(tree), Colv=FALSE, dendrogram = 'row',
+    col = c("red", "green"),
+    breaks = c(-1, 0, 1),
+    trace = 'none',
+    key = FALSE,
     RowSideColors = rowColors,
     ColSideColors = colColors
   )
@@ -247,9 +249,9 @@ drawNetHeatMap = function(sampleMatrix, tree, osa, num_clusters, fieldOrder) {
 #' Performs enrichment analysis of traits against a network dendrogram
 #'
 #' Iterates through the tree created by the clusterEdges() function and
-#' performs a Fisher's test on each of the 
+#' performs a Fisher's test on each of the
 #'
-#' 
+#'
 #' @param tree
 #'   An instance of an hclust object.
 #' @param osa
@@ -272,47 +274,47 @@ drawNetHeatMap = function(sampleMatrix, tree, osa, num_clusters, fieldOrder) {
 #'   The minimum number of network edges that must be present in a cluster
 #'   In order for that cluster to be analyzed.
 #' @param outfile
-#'   The name of the file where output results are stored.  
+#'   The name of the file where output results are stored.
 #' @export
 #' @examples
-#'   
+#'
 analyzeEdgeTree = function(tree, osa, net, fields, alpha = 0.001, min_presence = 0.80,
   min_cluster_size = 3, outfile = 'output.scc.txt') {
-  
+
   height_array = unique(tree$height)
   height_array = sort(height_array, decreasing = TRUE)
   seen = list()
- 
+
   # Initialize seen_checksums empty vector
   seen_checksums <- vector(mode="character", length=0)
   prev_indexes = list()
- 
+
   # Iterate through the dendrogram at increasing heights and perform
   # enrichment analysis
   output = file(outfile, "w")
-  write(paste("Cluster_ID", "Parent_ID", "Depth", "Height", "Clusters", "Cluster_Num", "Size", 
-    "Avg Degree", "Type", "Counts", "Categories", "Enrichment", "Nodes", "Edge Index", 
+  write(paste("Cluster_ID", "Parent_ID", "Depth", "Height", "Clusters", "Cluster_Num", "Size",
+    "Avg Degree", "Type", "Counts", "Categories", "Enrichment", "Nodes", "Edge Index",
     sep="\t"), file=output, append=TRUE)
   depth = 1
   for (height in height_array) {
     members = cutree(tree, h = height)
     num_clusters = length(unique(members))
     #drawDendro(osa, members, samples, depth, 'Treatment')
-  
-    prev_indexes[[depth]] = list() 
+
+    prev_indexes[[depth]] = list()
     for(i in unique(members)) {
       print(paste("Depth: ", depth, ", Num Clusters: ", num_clusters, ", Cluster: ", i, sep=""))
- 
-      cluster_indexes = as.integer(which(members == i))   
+
+      cluster_indexes = as.integer(which(members == i))
       clust_chksm = digest(cluster_indexes)
       prev_indexes[[depth]][[clust_chksm]] = cluster_indexes
- 
+
       # if the checksum of the cluster index array is not in seen_checksums
       if (!is.element(clust_chksm, seen_checksums)) {
- 
+
         # Add it to seen checksums
         seen_checksums = c(seen_checksums, clust_chksm)
- 
+
         # Find the parent
         parent = NA
         if (depth > 1) {
@@ -322,14 +324,14 @@ analyzeEdgeTree = function(tree, osa, net, fields, alpha = 0.001, min_presence =
             }
           }
         }
- 
+
         # Calculate the average degree
         cluster_nodes = unique(c(
-          net[which(members == i), c('Source')], 
+          net[which(members == i), c('Source')],
           net[which(members == i), c('Target')]
         ))
         avg_degree = (length(which(members == i)) * 2) / length(cluster_nodes)
- 
+
         # Run enrichment
         if (length(cluster_indexes) >= min_cluster_size) {
           for (field in fields) {
@@ -350,11 +352,11 @@ analyzeEdgeTree = function(tree, osa, net, fields, alpha = 0.001, min_presence =
                   field,
                   paste(counts, collapse=","),
                   paste(unique(osa[,c(field)]), collapse=","),
-                  paste(enrichment, collapse=","), 
-                  paste(cluster_nodes, collapse=","), 
+                  paste(enrichment, collapse=","),
+                  paste(cluster_nodes, collapse=","),
                   paste(cluster_indexes, collapse=","),
                   sep="\t"),
-                file = output, 
+                file = output,
                 append = TRUE
               )
             #} # end if(length(which(enrichment….
@@ -363,7 +365,7 @@ analyzeEdgeTree = function(tree, osa, net, fields, alpha = 0.001, min_presence =
         else {
           print("Skipping, cluster too small")
         }
-      } # end if (!is.element(clust_chksm, 
+      } # end if (!is.element(clust_chksm,
       else {
         print("Skipping, already seen")
       }
