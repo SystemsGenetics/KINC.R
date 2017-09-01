@@ -3,6 +3,7 @@
 export(RMT)
 export(analyzeEdgeTree)
 export(clusterEdges)
+export(drawNetHeatMap)
 export(getSampleMatrix)
 export(loadNetwork)
 export(loadSampleAnnotations)

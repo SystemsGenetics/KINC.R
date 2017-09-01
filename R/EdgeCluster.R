@@ -213,12 +213,14 @@ test_module = function(net, edge_indexes, osa, field, min_presence = 0.95) {
 #' @export
 drawNetHeatMap = function(sampleMatrix, tree, osa, num_clusters, fieldOrder, outfile_prefix = 'heatmap') {
 
-  # Reorder samples according to the fieldOrder argument.
+  # Reorder samples in the sampleMatrix according to the fieldOrder argument.
   sample_order = eval(parse(text=paste('order(osa$', paste(fieldOrder, collapse=' ,osa$'), ")", sep="")))
   sampleMatrix2 = sampleMatrix[, c(sample_order)]
 
+  # Get the members of each cluster.
   members = cutree(tree, k = num_clusters)
 
+  # 
   categories = do.call(paste, list(c(osa[, fieldOrder]), sep="-"))
   num_categories = length(unique(categories))
   osa$hmap_categories = categories
@@ -230,18 +232,21 @@ drawNetHeatMap = function(sampleMatrix, tree, osa, num_clusters, fieldOrder, out
     Cluster = unique(members),
     color = rgb(runif(num_clusters), runif(num_clusters), runif(num_clusters))
   )
-  colColors = as.character(merge(osa, tColors, by.x="hmap_categories", by.y="Field", sort=FALSE)$Color)
+  colColors = as.character(merge(osa, tColors, by.x="hmap_categories", by.y="Field", sort=TRUE)$Color)
   rowColors = as.character(factor(members, labels=mColors$color))
 
-  png(filename=paste(outfile_prefix, paste(fieldOrder, collapse="-"), num_clusters, "png", sep="."),
-    width=3000, height=21000, res=300)
-  heatmap.2(sampleMatrix2, Rowv=as.dendrogram(tree), Colv=FALSE, dendrogram = 'row',
+  outfile = paste(outfile_prefix, paste(fieldOrder, collapse="-"), num_clusters, "png", sep=".")
+  png(filename = outfile, width=3000, height=21000, res=300)
+  heatmap.2(sampleMatrix2, 
+    Rowv=as.dendrogram(tree), 
+    Colv=FALSE, 
+    dendrogram = 'row',
     col = c("red", "green"),
     breaks = c(-1, 0, 1),
     trace = 'none',
-    key = FALSE,
+    key = TRUE,
     RowSideColors = rowColors,
-    ColSideColors = colColors
+    ColSideColors = colColors,
   )
   dev.off()
 }
