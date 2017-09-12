@@ -1,10 +1,16 @@
 Package: KINC.R
-Title: What the Package Does (one line, title case)
-Version: 0.0.0.9000
+Title: Provides additional functions for network files created using KINC.
+Version: 0.1.0
 Authors@R: person("Stephen", "Ficklin", email = "stephen.ficklin@wsu.edu", role = c("aut", "cre"))
 Description: What the package does (one paragraph).
 Depends: R (>= 3.2.0)
-License: What license is it under?
+License: GPL-2
 Encoding: UTF-8
 LazyData: true
 RoxygenNote: 6.0.1.9000
+Imports:
+  gplots,
+  plotrix,
+  digest,
+  RSQLite,
+  DBI

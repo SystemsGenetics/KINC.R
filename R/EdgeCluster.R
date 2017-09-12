@@ -1,7 +1,3 @@
-library(gplots)
-library(plotrix)
-library(digest)
-
 #' Imports sample annotations.
 #'
 #' The format of the sample annotation file is tab delimited where the
@@ -95,6 +91,7 @@ getSampleMatrix = function(net) {
 
   return(samples)
 }
+
 #' Performs a fisher's exact test on a sample.
 #'
 #' The sample annotation matrix consists of multiple columns of annotation
@@ -109,7 +106,7 @@ getSampleMatrix = function(net) {
 #' @param sample_types
 #'   The ordered array of annotations for all samples (i.e. a full column
 #'   of the sample annotation matrix).
-#' @parm rep_samples
+#' @param rep_samples
 #'   An array of samples that represent the edge cluster being tested.
 fishers_test = function(category, sample_types, rep_samples) {
   #  Contingency matrix for each category  in a module:
@@ -142,13 +139,18 @@ fishers_test = function(category, sample_types, rep_samples) {
   return(res$p.value)
 } # end fisher’s test function
 
+#' Performs signifcane association of a subnetwork with a field.
 #'
 #' @param net
 #    The network
-#' @edge_indexes:  the index of the edges in the network that comprise the module.
-#' @osa: the ordered sample annotation data frame
-#' @field: the field in the osa variable on which enrichment will be performed.
-#' @min_presence: the percentage of edges in the module for which a sample
+#' @edge_indexes
+#'   The index of the edges in the network that comprise the module.
+#' @osa
+#'   The ordered sample annotation data frame.
+#' @field
+#'   The field in the osa variable on which enrichment will be performed.
+#' @min_presence
+#'   The percentage of edges in the module for which a sample
 #'   must be present in order to be counted.
 test_module = function(net, edge_indexes, osa, field, min_presence = 0.95) {
 
@@ -220,7 +222,7 @@ drawNetHeatMap = function(sampleMatrix, tree, osa, num_clusters, fieldOrder, out
   # Get the members of each cluster.
   members = cutree(tree, k = num_clusters)
 
-  # 
+  #
   categories = do.call(paste, list(c(osa[, fieldOrder]), sep="-"))
   num_categories = length(unique(categories))
   osa$hmap_categories = categories
@@ -232,21 +234,21 @@ drawNetHeatMap = function(sampleMatrix, tree, osa, num_clusters, fieldOrder, out
     Cluster = unique(members),
     color = rgb(runif(num_clusters), runif(num_clusters), runif(num_clusters))
   )
-  colColors = as.character(merge(osa, tColors, by.x="hmap_categories", by.y="Field", sort=TRUE)$Color)
+  colColors = as.character(merge(osa[sample_order,], tColors, by.x="hmap_categories", by.y="Field", sort=FALSE)$Color)
   rowColors = as.character(factor(members, labels=mColors$color))
 
   outfile = paste(outfile_prefix, paste(fieldOrder, collapse="-"), num_clusters, "png", sep=".")
   png(filename = outfile, width=3000, height=21000, res=300)
-  heatmap.2(sampleMatrix2, 
-    Rowv=as.dendrogram(tree), 
-    Colv=FALSE, 
+  heatmap.2(sampleMatrix2,
+    Rowv=as.dendrogram(tree),
+    Colv=FALSE,
     dendrogram = 'row',
     col = c("red", "green"),
     breaks = c(-1, 0, 1),
     trace = 'none',
     key = TRUE,
     RowSideColors = rowColors,
-    ColSideColors = colColors,
+    ColSideColors = colColors
   )
   dev.off()
 }
@@ -286,6 +288,37 @@ drawNetHeatMap = function(sampleMatrix, tree, osa, num_clusters, fieldOrder, out
 analyzeEdgeTree = function(tree, osa, net, fields, alpha = 0.001, min_presence = 0.80,
   min_cluster_size = 3, outfile = 'output.scc.txt') {
 
+  # Build the database schema using data frames.
+  # TODO: remove the database if it already exists to keep it from growing forever.
+  dbfile = paste(outfile, 'db', sep=".")
+  unlink(dbfile)
+  db = dbConnect(RSQLite::SQLite(), dbfile)
+  clusters = data.frame(
+    cluster_id = vector('character'),
+    parent = vector('character'),
+    depth = vector('numeric'),
+    height = vector('numeric'),
+    num_clusters = vector('numeric'),
+    cluster_index = vector('numeric'),
+    size = vector('numeric'),
+    avg_degree =vector('numeric')
+  )
+  dbWriteTable(db, "clusters", clusters)
+  dbExecute(db, "CREATE UNIQUE INDEX cluster_id_clusters_idx ON clusters (cluster_id)")
+  dbExecute(db, "CREATE INDEX cluster_parent_clusters_idx ON clusters (parent)")
+
+  cluster_factors = data.frame(
+    cluster_id = vector('character'),
+    category = vector('character'),
+    type = vector('character'),
+    value =  vector('numeric'),
+    p_val = vector('numeric')
+  )
+  dbWriteTable(db, "cluster_factors", cluster_factor)
+  dbExecute(db, "CREATE INDEX cluster_id_cluster_factors_idx ON cluster_factors (cluster_id)")
+  dbExecute(db, "CREATE INDEX p_val__cluster_factor_idx ON cluster_factors (p_val)")
+  dbExecute(db, "CREATE UNIQUE INDEX cluster_factor_uq1 ON cluster_factors (cluster_id, category, type)")
+
   height_array = unique(tree$height)
   height_array = sort(height_array, decreasing = TRUE)
   seen = list()
@@ -314,6 +347,8 @@ analyzeEdgeTree = function(tree, osa, net, fields, alpha = 0.001, min_presence =
       clust_chksm = digest(cluster_indexes)
       prev_indexes[[depth]][[clust_chksm]] = cluster_indexes
 
+      paste("INSERT INTO cluster")
+
       # if the checksum of the cluster index array is not in seen_checksums
       if (!is.element(clust_chksm, seen_checksums)) {
 
@@ -339,11 +374,14 @@ analyzeEdgeTree = function(tree, osa, net, fields, alpha = 0.001, min_presence =
 
         # Run enrichment
         if (length(cluster_indexes) >= min_cluster_size) {
+          # Intialize the cluster object.
+
           for (field in fields) {
             results = test_module(net, cluster_indexes, osa, field, min_presence)
             enrichment = results[[1]]
             counts = results[[2]]
             #if (length(which(enrichment < alpha)) > 0) {
+
               write(
                 paste(
                   clust_chksm,
@@ -379,4 +417,6 @@ analyzeEdgeTree = function(tree, osa, net, fields, alpha = 0.001, min_presence =
   } # end for (height in height_array) {
   close(output)
 }
+
+
 
