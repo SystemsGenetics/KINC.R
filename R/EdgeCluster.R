@@ -142,16 +142,18 @@ fishers_test = function(category, sample_types, rep_samples) {
 #' Performs signifcane association of a subnetwork with a field.
 #'
 #' @param net
-#    The network
-#' @edge_indexes
+#'   A network data frame containing the KINC-produced network.  The loadNetwork
+#'   function imports a dataframe in the correct format for this function.
+#' @param edge_indexes
 #'   The index of the edges in the network that comprise the module.
-#' @osa
+#' @param osa
 #'   The ordered sample annotation data frame.
-#' @field
+#' @param field
 #'   The field in the osa variable on which enrichment will be performed.
-#' @min_presence
+#' @param min_presence
 #'   The percentage of edges in the module for which a sample
 #'   must be present in order to be counted.
+#'
 test_module = function(net, edge_indexes, osa, field, min_presence = 0.95) {
 
   sample_types = as.character(osa[[field]])
@@ -252,7 +254,58 @@ drawNetHeatMap = function(sampleMatrix, tree, osa, num_clusters, fieldOrder, out
   )
   dev.off()
 }
+#' Performs enrichment analysis of traits against a a single edge in the network.
+#'
+#' @param i
+#'   The index of the edge in the network
+#' @param osa
+#'   The sample annotation matrix. One column must contain the header 'Sample'
+#'   and the remaining colums correspond to an annotation type.  The rows
+#'   of the anntation columns should contain the annotations.
+#' @param net
+#'   A network dataframe containing the KINC-produced network.  The loadNetwork
+#'   function imports a dataframe in the correct format for this function.
+#' @param fields
+#'   An array of fields that should be tested.  The fields must be a subset of
+#'   the column names that are present in the sample annotation matrix provided
+#'   by the osa parameter.
+#' @export
+#'
+#' @examples
+#'
+analyzeEdge = function(i, osa, net, fields) {
 
+  results = list()
+  for (field in fields) {
+    sample_types = as.character(osa[[field]])
+    sample_types[which(sample_types == "null")] = NA
+    sample_types[which(sample_types == "notreported")] = NA
+    num_samples = length(sample_types)
+
+    sample_types.prob = table(sample_types) / num_samples
+    nona.idx = which(!is.na(sample_types))
+    categories = sort(unique(sample_types[nona.idx]))
+
+    # Convert the sample string into an integer array.
+    edge = net[i,]
+    sample_str = edge$Samples
+    samples = as.numeric(strsplit(sample_str, "")[[1]])
+    samples[which(samples != 1)] = 0
+
+    # Create a vector indicating which samples should be
+    # counted as 1's.  This is a bit stupid to do but our
+    # fisher's test function is written to expect that
+    # a module of edges and there is some threshold for
+    # considering which samples should be a 1. In this
+    # case it's obvious but we need the vector to run the function.
+    rep_samples = which(samples == 1)
+
+    pvals = sapply(categories, fishers_test, sample_types, rep_samples)
+    results[[field]] = pvals
+  }
+  return(results)
+
+}
 #' Performs enrichment analysis of traits against a network dendrogram
 #'
 #' Iterates through the tree created by the clusterEdges() function and
@@ -269,8 +322,8 @@ drawNetHeatMap = function(sampleMatrix, tree, osa, num_clusters, fieldOrder, out
 #'   A network dataframe containing the KINC-produced network.  The loadNetwork
 #'   function imports a dataframe in the correct format for this function.
 #' @param fields
-#'   An array of fields that should be tested.  The fields must match the
-#'   column names that are present in the sample annotation matrix provided
+#'   An array of fields that should be tested.  The fields must be a subset of
+#'   the column names that are present in the sample annotation matrix provided
 #'   by the osa parameter.
 #' @param alpha
 #'   For enrichment testing the alpha value used for significance.
@@ -287,37 +340,6 @@ drawNetHeatMap = function(sampleMatrix, tree, osa, num_clusters, fieldOrder, out
 #'
 analyzeEdgeTree = function(tree, osa, net, fields, alpha = 0.001, min_presence = 0.80,
   min_cluster_size = 3, outfile = 'output.scc.txt') {
-
-  # Build the database schema using data frames.
-  # TODO: remove the database if it already exists to keep it from growing forever.
-  dbfile = paste(outfile, 'db', sep=".")
-  unlink(dbfile)
-  db = dbConnect(RSQLite::SQLite(), dbfile)
-  clusters = data.frame(
-    cluster_id = vector('character'),
-    parent = vector('character'),
-    depth = vector('numeric'),
-    height = vector('numeric'),
-    num_clusters = vector('numeric'),
-    cluster_index = vector('numeric'),
-    size = vector('numeric'),
-    avg_degree =vector('numeric')
-  )
-  dbWriteTable(db, "clusters", clusters)
-  dbExecute(db, "CREATE UNIQUE INDEX cluster_id_clusters_idx ON clusters (cluster_id)")
-  dbExecute(db, "CREATE INDEX cluster_parent_clusters_idx ON clusters (parent)")
-
-  cluster_factors = data.frame(
-    cluster_id = vector('character'),
-    category = vector('character'),
-    type = vector('character'),
-    value =  vector('numeric'),
-    p_val = vector('numeric')
-  )
-  dbWriteTable(db, "cluster_factors", cluster_factor)
-  dbExecute(db, "CREATE INDEX cluster_id_cluster_factors_idx ON cluster_factors (cluster_id)")
-  dbExecute(db, "CREATE INDEX p_val__cluster_factor_idx ON cluster_factors (p_val)")
-  dbExecute(db, "CREATE UNIQUE INDEX cluster_factor_uq1 ON cluster_factors (cluster_id, category, type)")
 
   height_array = unique(tree$height)
   height_array = sort(height_array, decreasing = TRUE)
