@@ -154,7 +154,8 @@ fishers_test = function(category, sample_types, rep_samples) {
 #'   The percentage of edges in the module for which a sample
 #'   must be present in order to be counted.
 #'
-test_module = function(net, edge_indexes, osa, field, min_presence = 0.95) {
+#' @export
+analyzeModule = function(edge_indexes, osa, net, field, min_presence = 0.95) {
 
   sample_types = as.character(osa[[field]])
   sample_types[which(sample_types == "null")] = NA
@@ -399,7 +400,7 @@ analyzeEdgeTree = function(tree, osa, net, fields, alpha = 0.001, min_presence =
           # Intialize the cluster object.
 
           for (field in fields) {
-            results = test_module(net, cluster_indexes, osa, field, min_presence)
+            results = analyzeModule(cluster_indexes, osa, net, field, min_presence)
             enrichment = results[[1]]
             counts = results[[2]]
             #if (length(which(enrichment < alpha)) > 0) {
