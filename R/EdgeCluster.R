@@ -224,13 +224,16 @@ drawNetHeatMap = function(sampleMatrix, tree, osa, fieldOrder, outfile_prefix = 
 #' @param net
 #'   A network data frame containing the KINC-produced network.  The loadNetwork
 #'   function imports a dataframe in the correct format for this function.
-#' @param field
-#'   The field in the osa variable on which enrichment will be performed.
+#' @param fieldOrder
+#'   A vector containing a list of sample attribute names for reordering of
+#'   of the samples. Each element of this vector should be the name of
+#'   a column in the osa matrix.  The sorting occurs first by the first
+#'   element, then by the second, etc.
 #' @export
-drawModuleHeatMap = function(edge_indexes, osa, net, field) {
-  ce = clusterEdges(net[edge_indexes,])
+drawModuleHeatMap = function(edge_indexes, osa, net, fieldOrder) {
+  ce.tree = clusterEdges(net[edge_indexes,])
   sm = getSampleMatrix(net[edge_indexes,])
-  drawNetHeatMap(sm, ce, osa, field)
+  drawNetHeatMap(sm, ce.tree, osa, fieldOrder)
 }
 
 #' Performs enrichment analysis of traits against a a single edge in the network.
