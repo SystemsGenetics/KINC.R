@@ -158,17 +158,17 @@ fishers_test = function(category, sample_types, sample_ref, correction = NA) {
 #' @param osa
 #'   The sample annotation matrix as created by the loadSampleAnnotations()
 #'   function.
-#' @param num_clusters
-#'   The number of edge clusters to draw on the sidebar.
 #' @param fieldOrder
 #'   A vector containing a list of sample attribute names for reordering of
 #'   of the samples. Each element of this vector should be the name of
 #'   a column in the osa matrix.  The sorting occurs first by the first
 #'   element, then by the second, etc.
 #' @param outfile_prefix
-#'   A prefix to add to the beginnging of the output heatmap image file.
+#'   An output file prefix to add to the beginnging of the output heatmap image file.
+#'   If this argument is not provided then the figure will be plotted to the
+#'   default devide rather than to a file.
 #' @export
-drawNetHeatMap = function(sampleMatrix, tree, osa, num_clusters, fieldOrder, outfile_prefix = 'heatmap') {
+drawNetHeatMap = function(sampleMatrix, tree, osa, fieldOrder, outfile_prefix = NA) {
 
   # Reorder samples in the sampleMatrix according to the fieldOrder argument.
   sample_order = eval(parse(text=paste('order(osa$', paste(fieldOrder, collapse=' ,osa$'), ")", sep="")))
@@ -192,8 +192,10 @@ drawNetHeatMap = function(sampleMatrix, tree, osa, num_clusters, fieldOrder, out
   colColors = as.character(merge(osa[sample_order,], tColors, by.x="hmap_categories", by.y="Field", sort=FALSE)$Color)
   rowColors = as.character(factor(members, labels=mColors$color))
 
-  #outfile = paste(outfile_prefix, paste(fieldOrder, collapse="-"), num_clusters, "png", sep=".")
-  #png(filename = outfile, width=3000, height=21000, res=300)
+  if (!is.na(outfile_prefix)) {
+    outfile = paste(outfile_prefix, paste(fieldOrder, collapse="-"), num_clusters, "png", sep=".")
+    png(filename = outfile, width=3000, height=21000, res=300)
+  }
   heatmap.2(sampleMatrix2,
     Rowv=as.dendrogram(tree),
     Colv=FALSE,
@@ -202,10 +204,13 @@ drawNetHeatMap = function(sampleMatrix, tree, osa, num_clusters, fieldOrder, out
     breaks = c(-1, 0, 1),
     trace = 'none',
     key = TRUE,
-    RowSideColors = rowColors,
-    ColSideColors = colColors
+    ColSideColors = colColors,
+    labRow = NULL,
+    labCol = NULL
   )
-  #dev.off()
+  if (!is.na(outfile_prefix)) {
+    dev.off()
+  }
 }
 
 #' Draws a heatmap with dendrogram of a module in the netework.
@@ -225,7 +230,7 @@ drawNetHeatMap = function(sampleMatrix, tree, osa, num_clusters, fieldOrder, out
 drawModuleHeatMap = function(edge_indexes, osa, net, field) {
   ce = clusterEdges(net[edge_indexes,])
   sm = getSampleMatrix(net[edge_indexes,])
-  drawNetHeatMap(sm, ce, osa, 1, field)
+  drawNetHeatMap(sm, ce, osa, field)
 }
 
 #' Performs enrichment analysis of traits against a a single edge in the network.
