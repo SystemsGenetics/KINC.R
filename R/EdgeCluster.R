@@ -25,7 +25,7 @@ loadSampleAnnotations = function (annotation_file, sample_order) {
   return(osa)
 }
 
-#' Perfoms clustering of edges in a network based on their sample compositions.
+#' Perfoms heirarchical clustering of edges in a network based on their sample compositions.
 #'
 #' This function uses the dist function to calucate a distance and the
 #' hclust function to generate the dendrogram.
@@ -92,7 +92,7 @@ getSampleMatrix = function(net) {
   return(samples)
 }
 
-#' Performs a fisher's exact test on a sample.
+#' Performs a fisher's exact test on a sample string.
 #'
 #' The sample annotation matrix consists of multiple columns of annotation
 #' types (or fields).  Each annotation type may have multiple distinct
@@ -107,8 +107,14 @@ getSampleMatrix = function(net) {
 #'   The ordered array of annotations for all samples (i.e. a full column
 #'   of the sample annotation matrix).
 #' @param rep_samples
-#'   An array of samples that represent the edge cluster being tested.
-fishers_test = function(category, sample_types, rep_samples) {
+#'   An array of numeric values indicating the strength of the sample in
+#'   the edge(s).
+#' @param correction.
+#'   The method to apply for multiple testing correction. Valid values are identical
+#'   to those available to the p.adjust function.  The default is to
+#'   apply no correction.
+#'
+fishers_test = function(category, sample_types, sample_ref, correction = NA) {
   #  Contingency matrix for each category  in a module:
   #
   #                   Is Type  Not Type Totals
@@ -116,86 +122,32 @@ fishers_test = function(category, sample_types, rep_samples) {
   #  Module          |  n11   |   n12   | n1p
   #  Not in Mod      |  n21   |   n22   | n2p
   #                  ------------------
-  #  Totals             np1       np2       npp
+  #  Totals             np1       np2     npp
   #
-  n11 = length(which(sample_types[rep_samples] == category))
-  n1p = length(which(!is.na(sample_types[rep_samples])))
+  n11 = round(sum(sample_ref[which(sample_types == category)]))
+  n12 = round(sum(sample_ref[which(sample_types != category)]))
   np1 = length(which(sample_types == category))
-  np2 = length(which(sample_types != category & !is.na(sample_types)))
+  np2 = length(which(sample_types != category))
   n21 = np1 - n11
-  n12 = n1p - n11
   n22 = np2 - n12
 
   contmatrix = matrix(
-    as.numeric(c(n11, n12, n21, n22)),
+    as.numeric(c(n11, n21, n12, n22)),
     nr=2,
     dimnames = list(
-      Is_Type = c("Yes", "No"),
-      In_Module = c("Yes", "No")
+      In_Module = c("Yes", "No"),
+      Is_Type = c("Yes", "No")
     )
   )
+  #print(category)
   #print(contmatrix)
   res = fisher.test(contmatrix, alternative="greater")
-  return(res$p.value)
+  p.value = res$p.value
+  if (!is.na(correction)) {
+    p.value = p.adjust(p.value, method=correction, n=length(unique(sample_types)))
+  }
+  return(p.value)
 } # end fisher’s test function
-
-#' Performs signifcane association of a subnetwork with a field.
-#'
-#' @param net
-#'   A network data frame containing the KINC-produced network.  The loadNetwork
-#'   function imports a dataframe in the correct format for this function.
-#' @param edge_indexes
-#'   The index of the edges in the network that comprise the module.
-#' @param osa
-#'   The ordered sample annotation data frame.
-#' @param field
-#'   The field in the osa variable on which enrichment will be performed.
-#' @param min_presence
-#'   The percentage of edges in the module for which a sample
-#'   must be present in order to be counted.
-#'
-#' @export
-analyzeModule = function(edge_indexes, osa, net, field, min_presence = 0.95) {
-
-  sample_types = as.character(osa[[field]])
-  sample_types[which(sample_types == "null")] = NA
-  sample_types[which(sample_types == "notreported")] = NA
-  num_samples = length(sample_types)
-
-  sample_types.prob = table(sample_types) / num_samples
-  nona.idx = which(!is.na(sample_types))
-  categories = sort(unique(sample_types[nona.idx]))
-
-  # Calculate the relative frequency of each sample in the module.
-  mod_edges = net[edge_indexes,]
-  num_edges = nrow(mod_edges)
-  sample_strs = mod_edges$Samples
-  mod_ref = vector(mode="numeric", length=num_samples)
-  for (sample_str in sample_strs) {
-    samples = as.numeric(strsplit(sample_str, "")[[1]])
-    samples[which(samples != 1)] = 0
-    mod_ref = mod_ref + samples
-  }
-  mod_ref = mod_ref / num_edges
-
-  # Get the list of samples that are present > min_presence% in the module.
-  rep_samples = which(mod_ref >= min_presence)
-  num_rep_samples = length(rep_samples)
-  if (num_rep_samples == 0) {
-    results = rep(NA, length(categories))
-    names(results) = categories
-    return(results)
-  }
-
-  # get the frequencies of each category.
-  rep_sample_types = as.character(na.omit(sample_types[rep_samples]))
-  mod.freq = table(rep_sample_types)
-  #print(mod.freq)
-
-  results = sapply(categories, fishers_test, sample_types, rep_samples)
-  names(results) = categories
-  return(list(results, table(rep_sample_types)))
-}
 
 #' Draws a heatmap with dendrogram with clusters identified.
 #'
@@ -240,8 +192,8 @@ drawNetHeatMap = function(sampleMatrix, tree, osa, num_clusters, fieldOrder, out
   colColors = as.character(merge(osa[sample_order,], tColors, by.x="hmap_categories", by.y="Field", sort=FALSE)$Color)
   rowColors = as.character(factor(members, labels=mColors$color))
 
-  outfile = paste(outfile_prefix, paste(fieldOrder, collapse="-"), num_clusters, "png", sep=".")
-  png(filename = outfile, width=3000, height=21000, res=300)
+  #outfile = paste(outfile_prefix, paste(fieldOrder, collapse="-"), num_clusters, "png", sep=".")
+  #png(filename = outfile, width=3000, height=21000, res=300)
   heatmap.2(sampleMatrix2,
     Rowv=as.dendrogram(tree),
     Colv=FALSE,
@@ -253,8 +205,29 @@ drawNetHeatMap = function(sampleMatrix, tree, osa, num_clusters, fieldOrder, out
     RowSideColors = rowColors,
     ColSideColors = colColors
   )
-  dev.off()
+  #dev.off()
 }
+
+#' Draws a heatmap with dendrogram of a module in the netework.
+#'
+#' @param edge_indexes
+#'   The index of the edges in the network that comprise the module.
+#' @param osa
+#'   The sample annotation matrix. One column must contain the header 'Sample'
+#'   and the remaining colums correspond to an annotation type.  The rows
+#'   of the anntation columns should contain the annotations.
+#' @param net
+#'   A network data frame containing the KINC-produced network.  The loadNetwork
+#'   function imports a dataframe in the correct format for this function.
+#' @param field
+#'   The field in the osa variable on which enrichment will be performed.
+#' @export
+drawModuleHeatMap = function(edge_indexes, osa, net, field) {
+  ce = clusterEdges(net[edge_indexes,])
+  sm = getSampleMatrix(net[edge_indexes,])
+  drawNetHeatMap(sm, ce, osa, 1, field)
+}
+
 #' Performs enrichment analysis of traits against a a single edge in the network.
 #'
 #' @param i
@@ -266,52 +239,87 @@ drawNetHeatMap = function(sampleMatrix, tree, osa, num_clusters, fieldOrder, out
 #' @param net
 #'   A network dataframe containing the KINC-produced network.  The loadNetwork
 #'   function imports a dataframe in the correct format for this function.
-#' @param fields
-#'   An array of fields that should be tested.  The fields must be a subset of
-#'   the column names that are present in the sample annotation matrix provided
-#'   by the osa parameter.
+#' @param field
+#'   The field in the osa variable on which enrichment will be performed.
+#' @param correction.
+#'   The method to apply for multiple testing correction. Valid values are identical
+#'   to those available to the p.adjust function.  The default is to
+#'   apply 'bonferroni' correction.
 #' @export
 #'
 #' @examples
 #'
-analyzeEdge = function(i, osa, net, fields) {
+analyzeEdge = function(i, osa, net, field, correction = 'bonferroni') {
 
-  results = list()
-  for (field in fields) {
-    sample_types = as.character(osa[[field]])
-    sample_types[which(sample_types == "null")] = NA
-    sample_types[which(sample_types == "notreported")] = NA
-    num_samples = length(sample_types)
+  sample_types = as.character(osa[[field]])
+  sample_types[which(sample_types == "null")] = NA
+  sample_types[which(sample_types == "notreported")] = NA
+  num_samples = length(sample_types)
 
-    sample_types.prob = table(sample_types) / num_samples
-    nona.idx = which(!is.na(sample_types))
-    categories = sort(unique(sample_types[nona.idx]))
+  sample_types.prob = table(sample_types) / num_samples
+  nona.idx = which(!is.na(sample_types))
+  categories = sort(unique(sample_types[nona.idx]))
 
-    # Convert the sample string into an integer array.
-    edge = net[i,]
-    sample_str = edge$Samples
+  # Convert the sample string into an integer array.
+  edge = net[i,]
+  sample_str = edge$Samples
+  samples = as.numeric(strsplit(sample_str, "")[[1]])
+  samples[which(samples != 1)] = 0
+
+  pvals = sapply(categories, fishers_test, sample_types, samples, correction)
+  return(pvals);
+}
+
+#' Performs significance association of a subnetwork with a field.
+#'
+#' @param net
+#'   A network data frame containing the KINC-produced network.  The loadNetwork
+#'   function imports a dataframe in the correct format for this function.
+#' @param edge_indexes
+#'   The index of the edges in the network that comprise the module.
+#' @param osa
+#'   The ordered sample annotation data frame.
+#' @param field
+#'   The field in the osa variable on which enrichment will be performed.
+#' @param correction.
+#'   The method to apply for multiple testing correction. Valid values are identical
+#'   to those available to the p.adjust function.  The default is to
+#'   apply 'bonferroni' correction.
+#'
+#' @export
+#'
+analyzeModule = function(edge_indexes, osa, net, field, correction = 'bonferroni') {
+
+  sample_types = as.character(osa[[field]])
+  sample_types[which(sample_types == "null")] = NA
+  sample_types[which(sample_types == "notreported")] = NA
+  num_samples = length(sample_types)
+
+  sample_types.prob = table(sample_types) / num_samples
+  nona.idx = which(!is.na(sample_types))
+  categories = sort(unique(sample_types[nona.idx]))
+
+  # Calculate the relative frequency of each sample in the module.
+  mod_edges = net[edge_indexes,]
+  num_edges = nrow(mod_edges)
+  sample_strs = mod_edges$Samples
+  mod_ref = vector(mode="numeric", length=num_samples)
+  for (sample_str in sample_strs) {
     samples = as.numeric(strsplit(sample_str, "")[[1]])
     samples[which(samples != 1)] = 0
-
-    # Create a vector indicating which samples should be
-    # counted as 1's.  This is a bit stupid to do but our
-    # fisher's test function is written to expect that
-    # a module of edges and there is some threshold for
-    # considering which samples should be a 1. In this
-    # case it's obvious but we need the vector to run the function.
-    rep_samples = which(samples == 1)
-
-    pvals = sapply(categories, fishers_test, sample_types, rep_samples)
-    results[[field]] = pvals
+    mod_ref = mod_ref + samples
   }
-  return(results)
+  mod_ref = mod_ref / num_edges
 
+  results = sapply(categories, fishers_test, sample_types, mod_ref, correction)
+  names(results) = categories
+  return(results)
 }
+
 #' Performs enrichment analysis of traits against a network dendrogram
 #'
 #' Iterates through the tree created by the clusterEdges() function and
 #' performs a Fisher's test on each of the
-#'
 #'
 #' @param tree
 #'   An instance of an hclust object.
@@ -322,55 +330,46 @@ analyzeEdge = function(i, osa, net, fields) {
 #' @param net
 #'   A network dataframe containing the KINC-produced network.  The loadNetwork
 #'   function imports a dataframe in the correct format for this function.
-#' @param fields
-#'   An array of fields that should be tested.  The fields must be a subset of
-#'   the column names that are present in the sample annotation matrix provided
-#'   by the osa parameter.
-#' @param alpha
-#'   For enrichment testing the alpha value used for significance.
-#' @param min_presence
-#'   For a sample to be counted as being present in a cluster it must
-#'   be present in a minimum percentage of edges
+#' @param field
+#'   The field in the osa variable on which enrichment will be performed.
 #' @param min_cluster_size
 #'   The minimum number of network edges that must be present in a cluster
 #'   In order for that cluster to be analyzed.
-#' @param outfile
-#'   The name of the file where output results are stored.
+#'
 #' @export
+#'
 #' @examples
 #'
-analyzeEdgeTree = function(tree, osa, net, fields, alpha = 0.001, min_presence = 0.80,
-  min_cluster_size = 3, outfile = 'output.scc.txt') {
+analyzeEdgeTree = function(tree, osa, net, field, min_cluster_size = 3) {
 
   height_array = unique(tree$height)
   height_array = sort(height_array, decreasing = TRUE)
-  seen = list()
 
   # Initialize seen_checksums empty vector
   seen_checksums <- vector(mode="character", length=0)
   prev_indexes = list()
 
+  # Create the list that will hold the results.
+  final_results = list();
+
+  pb <- txtProgressBar(min = 0, max = length(height_array), style = 3)
+
   # Iterate through the dendrogram at increasing heights and perform
   # enrichment analysis
-  output = file(outfile, "w")
-  write(paste("Cluster_ID", "Parent_ID", "Depth", "Height", "Clusters", "Cluster_Num", "Size",
-    "Avg Degree", "Type", "Counts", "Categories", "Enrichment", "Nodes", "Edge Index",
-    sep="\t"), file=output, append=TRUE)
   depth = 1
   for (height in height_array) {
+    setTxtProgressBar(pb, depth)
     members = cutree(tree, h = height)
     num_clusters = length(unique(members))
     #drawDendro(osa, members, samples, depth, 'Treatment')
 
     prev_indexes[[depth]] = list()
     for(i in unique(members)) {
-      print(paste("Depth: ", depth, ", Num Clusters: ", num_clusters, ", Cluster: ", i, sep=""))
+      # print(paste("Depth: ", depth, ", Num Clusters: ", num_clusters, ", Cluster: ", i, sep=""))
 
       cluster_indexes = as.integer(which(members == i))
       clust_chksm = digest(cluster_indexes)
       prev_indexes[[depth]][[clust_chksm]] = cluster_indexes
-
-      paste("INSERT INTO cluster")
 
       # if the checksum of the cluster index array is not in seen_checksums
       if (!is.element(clust_chksm, seen_checksums)) {
@@ -383,7 +382,7 @@ analyzeEdgeTree = function(tree, osa, net, fields, alpha = 0.001, min_presence =
         if (depth > 1) {
           for (pchksm in names(prev_indexes[[depth-1]])) {
             if (all(cluster_indexes %in% prev_indexes[[depth-1]][[pchksm]])) {
-                parent = pchksm
+              parent = pchksm
             }
           }
         }
@@ -395,51 +394,122 @@ analyzeEdgeTree = function(tree, osa, net, fields, alpha = 0.001, min_presence =
         ))
         avg_degree = (length(which(members == i)) * 2) / length(cluster_nodes)
 
-        # Run enrichment
+        # Run enrichment if the cluster size meets the minimum size limit.
         if (length(cluster_indexes) >= min_cluster_size) {
-          # Intialize the cluster object.
-
-          for (field in fields) {
-            results = analyzeModule(cluster_indexes, osa, net, field, min_presence)
-            enrichment = results[[1]]
-            counts = results[[2]]
-            #if (length(which(enrichment < alpha)) > 0) {
-
-              write(
-                paste(
-                  clust_chksm,
-                  parent,
-                  depth,
-                  height,
-                  num_clusters,
-                  i,
-                  length(cluster_indexes),
-                  avg_degree,
-                  field,
-                  paste(counts, collapse=","),
-                  paste(unique(osa[,c(field)]), collapse=","),
-                  paste(enrichment, collapse=","),
-                  paste(cluster_nodes, collapse=","),
-                  paste(cluster_indexes, collapse=","),
-                  sep="\t"),
-                file = output,
-                append = TRUE
-              )
-            #} # end if(length(which(enrichment….
-          } # end for (field in fields)
+          enrichment = analyzeModule(cluster_indexes, osa, net, field)
+          n = length(final_results)
+          final_results[[n+1]] = list(
+            "id" = clust_chksm,
+            "parent" = parent,
+            "depth" = depth,
+            "height" = height,
+            "num_clusters" = num_clusters,
+            "cluster" = i,
+            "cluster_size" = length(cluster_indexes),
+            "avg_degree" = avg_degree,
+            "field" = field,
+            "categories" = unique(osa[,c(field)]),
+            "p-vals" = enrichment,
+            "nodes" = cluster_nodes,
+            "edge_indexes" = cluster_indexes
+          );
         } # end if (length(cluster_indexes
-        else {
-          print("Skipping, cluster too small")
-        }
       } # end if (!is.element(clust_chksm,
-      else {
-        print("Skipping, already seen")
-      }
     } # end for(i in unique(members)) {
     depth = depth + 1
   } # end for (height in height_array) {
-  close(output)
+  close(pb)
+  return(final_results)
 }
 
+#' Writes to a file the results from the analyzeEdgeTree function.
+#'
+#' @param results
+#'   A list containing the results from the analyzeEdgeTree function.
+#' @param outfile
+#'   The name of the file where output results are stored.
+#' @param field
+#'   The field in the osa variable on which enrichment will be performed.
+#' @export
+#'
+writeEdgeTreeAnalysis = function(results, outfile = 'output.scc.txt') {
+  output = file(outfile, "w")
+  write(paste("Cluster_ID", "Parent_ID", "Depth", "Height", "Clusters", "Cluster_Num", "Size",
+              "Avg Degree", "Type", "Categories", "Enrichment", "Nodes", "Edge Index",
+              sep="\t"), file=output, append=FALSE)
+  pb <- txtProgressBar(min = 0, max = length(results), style = 3)
 
+  for(i in 1:length(results)) {
+    setTxtProgressBar(pb, i)
+    row = results[[i]]
+    write(
+      paste(
+        row$id,
+        row$parent,
+        row$depth,
+        row$height,
+        row$num_clusters,
+        row$cluster,
+        row$cluster_size,
+        row$avg_degree,
+        row$field,
+        paste(row$categories, collapse=","),
+        paste(row$"p-pvals", collapse=","),
+        paste(row$nodes, collapse=","),
+        paste(row$edge_indexes, collapse=","),
+        sep="\t"),
+      file = output,
+      append = TRUE
+    )
+  }
+  close(output)
+  close(pb)
+}
 
+#' Finds the best subgraph for the given field and category.
+#'
+#' Searches through the results from the analyzeEdgeTree for the cluster whose
+#' p-value is best given a specific field and category.
+#'
+#' @param results
+#'   A list containing the results from the analyzeEdgeTree function.
+#' @param field
+#'   One of the header names from the sample annnotation matrix.
+#' @param category
+#'   For categorical data in the sample annotation matrix, this is one of the
+#'   categories found in the field column.
+#' @param alpha
+#'   The alpha value used for significance.
+#'
+#' @return
+#'   A dataframe containing the set of subgraphs (heirarchical clusters)
+#'   that have a p-value less than alpha.
+#'
+#' @export
+findSubgraphs = function(results, field, category, alpha = 0.001) {
+  # The best matching row index and p-value in the results will be stored here.
+  best = list()
+
+  for(i in 1:length(results)) {
+    row = results[[i]]
+    if (row$field == field) {
+      cindex = which(row$categories == category)
+      if (cindex == 0) {
+        next;
+      }
+      sig.pvals = which(row$"p-vals" < 0.001)
+      if (length(sig.pvals) == 1 && cindex %in% sig.pvals) {
+        p = row$"p-vals"[cindex]
+        best[[length(best) + 1]] = list(
+          index = i,
+          p = p,
+          size = row$cluster_size,
+          avg_degree = row$avg_degree
+        )
+      }
+    }
+  }
+  matches = data.frame(matrix(unlist(best), nrow=length(best), ncol=4, byrow=T))
+  names(matches) = c('index', 'p' ,'size', 'avg_degree')
+  return(matches)
+}
