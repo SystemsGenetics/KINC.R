@@ -113,8 +113,11 @@ getSampleMatrix = function(net) {
 #'   The method to apply for multiple testing correction. Valid values are identical
 #'   to those available to the p.adjust function.  The default is to
 #'   apply no correction.
+#' @param alternative
+#'   indicates the alternative hypothesis and must be one of "two.sided",
+#'   "greater" or "less". You can specify just the initial letter.
 #'
-fishers_test = function(category, sample_types, sample_ref, correction = NA) {
+fishers_test = function(category, sample_types, sample_ref, correction = NA, alternative = 'greater') {
   #  Contingency matrix for each category  in a module:
   #
   #                   Is Type  Not Type Totals
@@ -141,7 +144,7 @@ fishers_test = function(category, sample_types, sample_ref, correction = NA) {
   )
   #print(category)
   #print(contmatrix)
-  res = fisher.test(contmatrix, alternative="greater")
+  res = fisher.test(contmatrix, alternative = alternative)
   p.value = res$p.value
   if (!is.na(correction)) {
     p.value = p.adjust(p.value, method=correction, n=length(unique(sample_types)))
@@ -200,7 +203,7 @@ drawNetHeatMap = function(sampleMatrix, tree, osa, fieldOrder, outfile_prefix = 
     Rowv=as.dendrogram(tree),
     Colv=FALSE,
     dendrogram = 'row',
-    col = c("red", "green"),
+    col = c("green", "red"),
     breaks = c(-1, 0, 1),
     trace = 'none',
     key = TRUE,
@@ -293,10 +296,12 @@ analyzeEdge = function(i, osa, net, field, correction = 'bonferroni') {
 #'   The method to apply for multiple testing correction. Valid values are identical
 #'   to those available to the p.adjust function.  The default is to
 #'   apply 'bonferroni' correction.
-#'
+#' @param alternative
+#'   indicates the alternative hypothesis and must be one of "two.sided",
+#'   "greater" or "less". You can specify just the initial letter.
 #' @export
 #'
-analyzeModule = function(edge_indexes, osa, net, field, correction = 'bonferroni') {
+analyzeModule = function(edge_indexes, osa, net, field, correction = 'bonferroni', alternative = 'greater') {
 
   sample_types = as.character(osa[[field]])
   sample_types[which(sample_types == "null")] = NA
@@ -319,9 +324,52 @@ analyzeModule = function(edge_indexes, osa, net, field, correction = 'bonferroni
   }
   mod_ref = mod_ref / num_edges
 
-  results = sapply(categories, fishers_test, sample_types, mod_ref, correction)
+  results = sapply(categories, fishers_test, sample_types, mod_ref, correction, alternative)
   names(results) = categories
   return(results)
+}
+
+#' Performs significance association for every edge in the network.
+#'
+#' @param net
+#'   A network data frame containing the KINC-produced network.  The loadNetwork
+#'   function imports a dataframe in the correct format for this function.
+#' @param osa
+#'   The ordered sample annotation data frame.
+#' @param field
+#'   The field in the osa variable on which enrichment will be performed.
+#' @param correction.
+#'   The method to apply for multiple testing correction. Valid values are identical
+#'   to those available to the p.adjust function.  The default is to
+#'   apply 'bonferroni' correction.
+#' @export
+#'
+analyzeNet = function(net, osa, field, correction = 'bonferroni') {
+
+  sample_types = as.character(osa[[field]])
+  sample_types[which(sample_types == "null")] = NA
+  sample_types[which(sample_types == "notreported")] = NA
+
+  categories = unique(sample_types)
+
+  # Add in new columns for each category.
+  net2 = net
+  for (category in categories) {
+    subname = paste(field, category, sep='_')
+    net2[subname] = NA
+  }
+
+  pb <- txtProgressBar(min = 0, max = nrow(net), style = 3)
+  for (i in 1:nrow(net)) {
+    setTxtProgressBar(pb, i)
+    p.vals = analyzeEdge(i, osa, net, field, correction)
+    for (category in names(p.vals)) {
+      subname = paste(field, category, sep='_')
+      net2[i, subname] = p.vals[category]
+    }
+  }
+  close(pb)
+  return(net2);
 }
 
 #' Performs enrichment analysis of traits against a network dendrogram
@@ -417,7 +465,7 @@ analyzeEdgeTree = function(tree, osa, net, field, min_cluster_size = 3) {
             "avg_degree" = avg_degree,
             "field" = field,
             "categories" = unique(osa[,c(field)]),
-            "p-vals" = enrichment,
+            "p_vals" = enrichment,
             "nodes" = cluster_nodes,
             "edge_indexes" = cluster_indexes
           );
@@ -505,9 +553,9 @@ findSubgraphs = function(results, field, category, alpha = 0.001) {
       if (cindex == 0) {
         next;
       }
-      sig.pvals = which(row$"p-vals" < 0.001)
+      sig.pvals = which(row$p_vals < 0.001)
       if (length(sig.pvals) == 1 && cindex %in% sig.pvals) {
-        p = row$"p-vals"[cindex]
+        p = row$p_vals[cindex]
         best[[length(best) + 1]] = list(
           index = i,
           p = p,
