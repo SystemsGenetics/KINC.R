@@ -177,23 +177,14 @@ drawNetHeatMap = function(sampleMatrix, tree, osa, fieldOrder, outfile_prefix = 
   sample_order = eval(parse(text=paste('order(osa$', paste(fieldOrder, collapse=' ,osa$'), ")", sep="")))
   sampleMatrix2 = sampleMatrix[, c(sample_order)]
 
-  # Get the members of each cluster.
-  members = cutree(tree, k = num_clusters)
-
-  #
-  categories = do.call(paste, list(c(osa[, fieldOrder]), sep="-"))
+  categories = do.call(paste, list(c(osa[, fieldOrder[1]]), sep="-"))
   num_categories = length(unique(categories))
   osa$hmap_categories = categories
   tColors = data.frame(
     Field = unique(categories),
     Color = rgb(runif(num_categories), runif(num_categories), runif(num_categories))
   )
-  mColors = data.frame(
-    Cluster = unique(members),
-    color = rgb(runif(num_clusters), runif(num_clusters), runif(num_clusters))
-  )
   colColors = as.character(merge(osa[sample_order,], tColors, by.x="hmap_categories", by.y="Field", sort=FALSE)$Color)
-  rowColors = as.character(factor(members, labels=mColors$color))
 
   if (!is.na(outfile_prefix)) {
     outfile = paste(outfile_prefix, paste(fieldOrder, collapse="-"), num_clusters, "png", sep=".")
@@ -203,10 +194,10 @@ drawNetHeatMap = function(sampleMatrix, tree, osa, fieldOrder, outfile_prefix = 
     Rowv=as.dendrogram(tree),
     Colv=FALSE,
     dendrogram = 'row',
-    col = c("green", "red"),
+    col = c("blue", "green"),
     breaks = c(-1, 0, 1),
     trace = 'none',
-    key = TRUE,
+    key = FALSE,
     ColSideColors = colColors,
     labRow = NULL,
     labCol = NULL
@@ -233,12 +224,70 @@ drawNetHeatMap = function(sampleMatrix, tree, osa, fieldOrder, outfile_prefix = 
 #'   a column in the osa matrix.  The sorting occurs first by the first
 #'   element, then by the second, etc.
 #' @export
-drawModuleHeatMap = function(edge_indexes, osa, net, fieldOrder) {
+drawEdgeListHeatMap = function(edge_indexes, osa, net, fieldOrder) {
   ce.tree = clusterEdges(net[edge_indexes,])
   sm = getSampleMatrix(net[edge_indexes,])
   drawNetHeatMap(sm, ce.tree, osa, fieldOrder)
 }
 
+#' Draws the graph of a set of edges in the network
+#'
+#' @param edge_indexes
+#'   The index of the edges in the network that comprise the module.
+#' @param osa
+#'   The sample annotation matrix. One column must contain the header 'Sample'
+#'   and the remaining colums correspond to an annotation type.  The rows
+#'   of the anntation columns should contain the annotations.
+#' @param net
+#'   A network data frame containing the KINC-produced network.  The loadNetwork
+#'   function imports a dataframe in the correct format for this function.
+#'
+#' @export
+graphEdgeList = function(edge_indexes, osa, net) {
+  edges = as.vector(unlist(t(net[edge_indexes, c('Source', 'Target')])))
+  g = graph(edges, directed = F)
+
+  # Don't show node labels if we have too many nodes.
+  vlc = 0.5
+  vs = 10
+  if (length(edge_indexes) > 100) {
+    vlc = 0.25
+    vs = 5
+  }
+  if (length(edge_indexes) > 1000) {
+    vlc = 0.001
+    vs = 2
+  }
+
+  # Plot the graph.
+  l = layout_with_kk(g)
+  plot(g,
+       # Verticies
+       vertex.label.color="black", vertex.label.cex = vlc, vertex.size = vs,
+       # Edges
+       edge.color="#AAAAAA", vertex.color='cyan',
+       # Layout
+       layout = l)
+  return(list(
+    graph = g,
+    layout = l
+  ))
+}
+#' Draws the graph of the entire network
+#'
+#' @param net
+#'   A network data frame containing the KINC-produced network.  The loadNetwork
+#'   function imports a dataframe in the correct format for this function.
+#' @param osa
+#'   The sample annotation matrix. One column must contain the header 'Sample'
+#'   and the remaining colums correspond to an annotation type.  The rows
+#'   of the anntation columns should contain the annotations.
+#' @export
+graphNet = function(net, osa) {
+  edge_indexes = c(1:length(net$Source));
+  g = graphEdgeList(edge_indexes, osa, net)
+  return(g)
+}
 #' Performs enrichment analysis of traits against a a single edge in the network.
 #'
 #' @param i
@@ -301,7 +350,7 @@ analyzeEdge = function(i, osa, net, field, correction = 'bonferroni') {
 #'   "greater" or "less". You can specify just the initial letter.
 #' @export
 #'
-analyzeModule = function(edge_indexes, osa, net, field, correction = 'bonferroni', alternative = 'greater') {
+analyzeEdgeList = function(edge_indexes, osa, net, field, correction = 'bonferroni', alternative = 'greater') {
 
   sample_types = as.character(osa[[field]])
   sample_types[which(sample_types == "null")] = NA
