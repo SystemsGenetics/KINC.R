@@ -1,29 +1,4 @@
-#' Imports sample annotations.
-#'
-#' The format of the sample annotation file is tab delimited where the
-#' first column is the sample name and every other column contains
-#' the annotation.  The file must contain a header with the annotation
-#' types.
-#'
-#' @param annotation_file
-#'   The path to the file containing the annotations.
-#' @param smaple_order
-#'   A file containing the order of samples in the sample strings of
-#'   the network.  The file should contain the list of samples each on
-#'   a separate line.
-#'
-#' @return
-#'   A data frame containing the annotations in the order of the samples.
-#'
-#' @export
-loadSampleAnnotations = function (annotation_file, sample_order) {
-  sample_annots = read.table(annotation_file, sep="\t", header=TRUE, row.names=NULL)
-  sample_order = read.table(sample_order, colClasses=c('character'),
-    col.names=c('Sample'))
-  osa = merge(sample_order, sample_annots, by = "Sample", sort=FALSE)
 
-  return(osa)
-}
 
 #' Perfoms heirarchical clustering of edges in a network based on their sample compositions.
 #'
