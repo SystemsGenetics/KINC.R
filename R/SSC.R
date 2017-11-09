@@ -16,7 +16,6 @@
 #'    An object of class hclust which describes the tree produced by the
 #'    clustering process.
 #'
-#' @export
 clusterEdges = function(net, distMethod = "manhattan", hclustMethod = "ward.D2") {
 
   # Convert the samples strings into a matrix.
@@ -144,8 +143,7 @@ fishers_test = function(category, sample_types, sample_ref, correction = NA, alt
 #'   An output file prefix to add to the beginnging of the output heatmap image file.
 #'   If this argument is not provided then the figure will be plotted to the
 #'   default devide rather than to a file.
-#' @export
-drawNetHeatMap = function(sampleMatrix, tree, osa, fieldOrder, outfile_prefix = NA) {
+drawEdgeTreeHeatMap = function(sampleMatrix, tree, osa, fieldOrder, outfile_prefix = NA) {
 
   # Reorder samples in the sampleMatrix according to the fieldOrder argument.
   sample_order = eval(parse(text=paste('order(osa$', paste(fieldOrder, collapse=' ,osa$'), ")", sep="")))
@@ -201,7 +199,7 @@ drawNetHeatMap = function(sampleMatrix, tree, osa, fieldOrder, outfile_prefix = 
 drawEdgeListHeatMap = function(edge_indexes, osa, net, fieldOrder) {
   ce.tree = clusterEdges(net[edge_indexes,])
   sm = getSampleMatrix(net[edge_indexes,])
-  drawNetHeatMap(sm, ce.tree, osa, fieldOrder)
+  drawEdgeTreeHeatMap(sm, ce.tree, osa, fieldOrder)
 }
 
 #' Performs enrichment analysis of traits against a a single edge in the network.
@@ -337,200 +335,3 @@ analyzeNet = function(net, osa, field, correction = 'bonferroni') {
   return(net2);
 }
 
-#' Performs enrichment analysis of traits against a network dendrogram
-#'
-#' Iterates through the tree created by the clusterEdges() function and
-#' performs a Fisher's test on each of the
-#'
-#' @param tree
-#'   An instance of an hclust object.
-#' @param osa
-#'   The sample annotation matrix. One column must contain the header 'Sample'
-#'   and the remaining colums correspond to an annotation type.  The rows
-#'   of the anntation columns should contain the annotations.
-#' @param net
-#'   A network dataframe containing the KINC-produced network.  The loadNetwork
-#'   function imports a dataframe in the correct format for this function.
-#' @param field
-#'   The field in the osa variable on which enrichment will be performed.
-#' @param min_cluster_size
-#'   The minimum number of network edges that must be present in a cluster
-#'   In order for that cluster to be analyzed.
-#'
-#' @export
-#'
-#' @examples
-#'
-analyzeEdgeTree = function(tree, osa, net, field, min_cluster_size = 3) {
-
-  height_array = unique(tree$height)
-  height_array = sort(height_array, decreasing = TRUE)
-
-  # Initialize seen_checksums empty vector
-  seen_checksums <- vector(mode="character", length=0)
-  prev_indexes = list()
-
-  # Create the list that will hold the results.
-  final_results = list();
-
-  pb <- txtProgressBar(min = 0, max = length(height_array), style = 3)
-
-  # Iterate through the dendrogram at increasing heights and perform
-  # enrichment analysis
-  depth = 1
-  for (height in height_array) {
-    setTxtProgressBar(pb, depth)
-    members = cutree(tree, h = height)
-    num_clusters = length(unique(members))
-    #drawDendro(osa, members, samples, depth, 'Treatment')
-
-    prev_indexes[[depth]] = list()
-    for(i in unique(members)) {
-      # print(paste("Depth: ", depth, ", Num Clusters: ", num_clusters, ", Cluster: ", i, sep=""))
-
-      cluster_indexes = as.integer(which(members == i))
-      clust_chksm = digest(cluster_indexes)
-      prev_indexes[[depth]][[clust_chksm]] = cluster_indexes
-
-      # if the checksum of the cluster index array is not in seen_checksums
-      if (!is.element(clust_chksm, seen_checksums)) {
-
-        # Add it to seen checksums
-        seen_checksums = c(seen_checksums, clust_chksm)
-
-        # Find the parent
-        parent = NA
-        if (depth > 1) {
-          for (pchksm in names(prev_indexes[[depth-1]])) {
-            if (all(cluster_indexes %in% prev_indexes[[depth-1]][[pchksm]])) {
-              parent = pchksm
-            }
-          }
-        }
-
-        # Calculate the average degree
-        cluster_nodes = unique(c(
-          net[which(members == i), c('Source')],
-          net[which(members == i), c('Target')]
-        ))
-        avg_degree = (length(which(members == i)) * 2) / length(cluster_nodes)
-
-        # Run enrichment if the cluster size meets the minimum size limit.
-        if (length(cluster_indexes) >= min_cluster_size) {
-          enrichment = analyzeModule(cluster_indexes, osa, net, field)
-          n = length(final_results)
-          final_results[[n+1]] = list(
-            "id" = clust_chksm,
-            "parent" = parent,
-            "depth" = depth,
-            "height" = height,
-            "num_clusters" = num_clusters,
-            "cluster" = i,
-            "cluster_size" = length(cluster_indexes),
-            "avg_degree" = avg_degree,
-            "field" = field,
-            "categories" = unique(osa[,c(field)]),
-            "p_vals" = enrichment,
-            "nodes" = cluster_nodes,
-            "edge_indexes" = cluster_indexes
-          );
-        } # end if (length(cluster_indexes
-      } # end if (!is.element(clust_chksm,
-    } # end for(i in unique(members)) {
-    depth = depth + 1
-  } # end for (height in height_array) {
-  close(pb)
-  return(final_results)
-}
-
-#' Writes to a file the results from the analyzeEdgeTree function.
-#'
-#' @param results
-#'   A list containing the results from the analyzeEdgeTree function.
-#' @param outfile
-#'   The name of the file where output results are stored.
-#' @param field
-#'   The field in the osa variable on which enrichment will be performed.
-#' @export
-#'
-writeEdgeTreeAnalysis = function(results, outfile = 'output.scc.txt') {
-  output = file(outfile, "w")
-  write(paste("Cluster_ID", "Parent_ID", "Depth", "Height", "Clusters", "Cluster_Num", "Size",
-              "Avg Degree", "Type", "Categories", "Enrichment", "Nodes", "Edge Index",
-              sep="\t"), file=output, append=FALSE)
-  pb <- txtProgressBar(min = 0, max = length(results), style = 3)
-
-  for(i in 1:length(results)) {
-    setTxtProgressBar(pb, i)
-    row = results[[i]]
-    write(
-      paste(
-        row$id,
-        row$parent,
-        row$depth,
-        row$height,
-        row$num_clusters,
-        row$cluster,
-        row$cluster_size,
-        row$avg_degree,
-        row$field,
-        paste(row$categories, collapse=","),
-        paste(row$"p-pvals", collapse=","),
-        paste(row$nodes, collapse=","),
-        paste(row$edge_indexes, collapse=","),
-        sep="\t"),
-      file = output,
-      append = TRUE
-    )
-  }
-  close(output)
-  close(pb)
-}
-
-#' Finds the best subgraph for the given field and category.
-#'
-#' Searches through the results from the analyzeEdgeTree for the cluster whose
-#' p-value is best given a specific field and category.
-#'
-#' @param results
-#'   A list containing the results from the analyzeEdgeTree function.
-#' @param field
-#'   One of the header names from the sample annnotation matrix.
-#' @param category
-#'   For categorical data in the sample annotation matrix, this is one of the
-#'   categories found in the field column.
-#' @param alpha
-#'   The alpha value used for significance.
-#'
-#' @return
-#'   A dataframe containing the set of subgraphs (heirarchical clusters)
-#'   that have a p-value less than alpha.
-#'
-#' @export
-findSubgraphs = function(results, field, category, alpha = 0.001) {
-  # The best matching row index and p-value in the results will be stored here.
-  best = list()
-
-  for(i in 1:length(results)) {
-    row = results[[i]]
-    if (row$field == field) {
-      cindex = which(row$categories == category)
-      if (cindex == 0) {
-        next;
-      }
-      sig.pvals = which(row$p_vals < 0.001)
-      if (length(sig.pvals) == 1 && cindex %in% sig.pvals) {
-        p = row$p_vals[cindex]
-        best[[length(best) + 1]] = list(
-          index = i,
-          p = p,
-          size = row$cluster_size,
-          avg_degree = row$avg_degree
-        )
-      }
-    }
-  }
-  matches = data.frame(matrix(unlist(best), nrow=length(best), ncol=4, byrow=T))
-  names(matches) = c('index', 'p' ,'size', 'avg_degree')
-  return(matches)
-}
