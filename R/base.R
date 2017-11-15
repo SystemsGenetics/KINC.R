@@ -78,7 +78,7 @@ graphNet = function(net, osa) {
 #'   function imports a dataframe in the correct format for this function.
 #'
 #' @export
-graphEdgeList = function(edge_indexes, osa, net) {
+graphEdgeList = function(edge_indexes, osa, net, field) {
   edges = as.vector(unlist(t(net[edge_indexes, c('Source', 'Target')])))
   g = graph(edges, directed = F)
 
@@ -94,13 +94,24 @@ graphEdgeList = function(edge_indexes, osa, net) {
     vs = 2
   }
 
+  sample_types = as.character(osa[[field]])
+  sample_types[which(sample_types == "null")] = NA
+  sample_types[which(sample_types == "notreported")] = NA
+
+  categories = sort(unique(sample_types[nona.idx]))
+  max = lapply(categories, FUN=function(x) {
+    subname = paste(field, x, sep='_')
+    return(min(net[, c(subname)], na.rm = TRUE))
+  })
+
+
   # Plot the graph.
   l = layout_with_kk(g)
   plot(g,
        # Verticies
        vertex.label.color="black", vertex.label.cex = vlc, vertex.size = vs,
        # Edges
-       edge.color="#AAAAAA", vertex.color='cyan',
+       edge.color=rep("#AAAAAA", length(edge_indexes)), vertex.color='cyan',
        # Layout
        layout = l)
   return(list(
