@@ -4,14 +4,14 @@
 \alias{RMT}
 \title{Performs the RMT analysis on a gene similarity matrix.}
 \usage{
-RMT(net, start = 0.99, end = 0.75, step = -0.001, min.eigens = 100,
-  save.plot = FALSE)
+RMT(net, simcol = "sc", start = 0.99, end = 0.75, step = -0.001,
+  min.eigens = 100, save.plot = FALSE)
 }
 \arguments{
 \item{net}{A network dataframe containing the KINC-produced network.  The loadNetwork
 function imports a dataframe in the correct format for this function.}
 
-\item{start}{The similarity score at which to start RMT analysis. The RMT will 
+\item{start}{The similarity score at which to start RMT analysis. The RMT will
 iterate through successively lower similarity scores. By default
 it performs the ChiSquare test of a reduced matrix that only contains
 genes with correlation at or above this start value. Default is 0.99.}
@@ -26,18 +26,18 @@ Default is -0.001.}
 reduces similarity matrix must first be calculated.  This argument
 sets the limit for the number of eigenvalues that must be present in
 order to perform the test. This roughly corresponds to the number of
-genes in the reduced similarity matrix.  The actual number of 
+genes in the reduced similarity matrix.  The actual number of
 eigenvalues may be smaller than the number of genes if duplicates
 are present.  Duplicates are removed. Default is 100.}
 
 \item{save.plot}{Set to TRUE to save a plot at each iteration.}
 }
 \description{
-During Random Matrix Theory (RMT) analysis, a subset of the similarity 
-matrix is tested to see how closely the nearest neighbor spacing 
+During Random Matrix Theory (RMT) analysis, a subset of the similarity
+matrix is tested to see how closely the nearest neighbor spacing
 distribution (NNSD) of its eigenvalues. A NNSD that appears
 Guassian is indicative of a random matrix.  Naturally occuring networks
-do not exhibit random behavior and their NNSD appears Poisson.  This 
+do not exhibit random behavior and their NNSD appears Poisson.  This
 function iterates through a successively decreasing similarity score
 values, creates a subset of the similarity matrix containing only genes
 with similarity values at or above the test score and performs a Chi-square
@@ -45,9 +45,9 @@ test on its NNSD.  Prior to testing, eigenvalues are spectrally unfolded
 and then fit with a spline.  The NNSD is essentially a historgram with
 60 bins.  Therefore, the Chi-square test has 60 degrees of freedom and
 the test statistic, 99.607, corresponding to a p-value of 0.001. Thus
-A Chi-square test less than or equal to 99.607 indicates that the 
+A Chi-square test less than or equal to 99.607 indicates that the
 similarity submatrix appears Poisson.
 }
 \examples{
-  
+
 }
