@@ -335,7 +335,8 @@ findLinkedCommunities = function(net, file_prefix, module_prefix = 'M', sim_col 
   new_net$Module = NA
 
   # Linked community method doesn't do well with disconnected graphs. So, first we want
-  # to decompose the graph into its disjointed subgraphs:
+  # to decompose the graph into its disjointed subgraphs.  If the callee doesn't want
+  # modules to span inverse edges then remove those.
   if (ignore_inverse) {
     g = graph.edgelist(as.matrix(net[which(net[[sim_col]] > 0), c('Source', 'Target')]), directed = F)
     E(g)$weight = abs(net[which(net[[sim_col]] > 0), sim_col])
@@ -361,28 +362,30 @@ findLinkedCommunities = function(net, file_prefix, module_prefix = 'M', sim_col 
 
     # If the meta analysis was selected.
     if (meta) {
-      mc = meta.communities(lc, hcmethod = 'ward.D2', deepSplit = 4)
-      lc = mc
+      r = mergeCommunities(lc)
     }
 
-    lcs[[gi]] = lc
+    lcs[[gi]] = r
 
     # Iterate through all of the edges in the graph and add the module to the
     # network
-    for (i in 1:nrow(lc$edges)) {
-      node1 = as.character(lc$edges[i,'node1'])
-      node2 = as.character(lc$edges[i,'node2'])
-      cluster = as.integer(lc$edges[i,'cluster'])
+    for (i in 1:length(r$cedges)) {
+      for (j in 1:length(r$cedges[[i]])) {
+        edge = subnet[r$cedges[[i]][j],]
+        node1 = edge[1]
+        node2 = edge[2]
+        cluster = i
 
-      ei = which(new_net$Source == node1 & new_net$Target == node2)
-      if (length(ei) > 0) {
-        module = sprintf("SG%02dM%04d", gi, cluster)
-        new_net[ei,]$Module = module
-      }
-      ei = which(new_net$Target == node1 & new_net$Source == node2)
-      if (length(ei) > 0) {
-        module = sprintf("SG%02dM%04d", gi, cluster)
-        new_net[ei,]$Module = module
+        ei = which(new_net$Source == node1 & new_net$Target == node2)
+        if (length(ei) > 0) {
+          module = sprintf("SG%02dM%04d", gi, cluster)
+          new_net[ei,]$Module = module
+        }
+        ei = which(new_net$Target == node1 & new_net$Source == node2)
+        if (length(ei) > 0) {
+          module = sprintf("SG%02dM%04d", gi, cluster)
+          new_net[ei,]$Module = module
+        }
       }
     }
   }
@@ -396,7 +399,6 @@ findLinkedCommunities = function(net, file_prefix, module_prefix = 'M', sim_col 
   node_list = data.frame(Node=c(new_net$Source, new_net$Target), Cluster=c(new_net$Module, new_net$Module))
   write.table(unique(node_list), file=paste(file_prefix, "coexpnet.edges.lcmByNodes.txt", sep=".") ,sep="\t", row.names=FALSE, append=FALSE, quote=FALSE, col.names=FALSE)
 
-
   # convert the edge and cluster into a report of modules by edge which can
   # be used for Cytoscape.
   new_net_edges = cbind(paste(new_net$Source, "(co)", new_net$Target, sep=" "), new_net$Module)
@@ -405,4 +407,62 @@ findLinkedCommunities = function(net, file_prefix, module_prefix = 'M', sim_col 
   write.table(new_net_edges, file=paste(file_prefix, "coexpnet.edges.lcm.cys.txt", sep=".") ,sep="\t", row.names=FALSE, append=FALSE, quote=FALSE)
 
   return(lcs)
+}
+
+mergeClusters = function(cedges, cnodes, th = 0.4) {
+  nclusters = length(cedges)
+
+  best = data.frame(i = 0, j = 0, ji = 0)
+  for (i in 1:nclusters) {
+    if (best$ji[1] == 1) next
+    for (j in 1:nclusters) {
+      if (best$ji[1] == 1) next
+      if (j >= i) next
+      A = as.character(cnodes$node[which(cnodes$cluster == i)])
+      B = as.character(cnodes$node[which(cnodes$cluster == j)])
+      overlap_i = length(intersect(A, B))/length(A)
+      overlap_j = length(intersect(A, B))/length(B)
+
+      if (overlap_i > best$ji[1]) {
+        best$i[1] = i
+        best$j[1] = j
+        best$ji[1] = overlap_i
+      }
+      if (overlap_j > best$ji[1]) {
+        best$i[1] = i
+        best$j[1] = j
+        best$ji[1] = overlap_j
+      }
+    }
+  }
+
+  # Now merge the best two clusters as long as the jaccard score is above
+  # our given threshold.
+  if (best$ji[1] > th) {
+    i = best$i[1]
+    j = best$j[1]
+    cat(paste("Merging", i, 'and', j, 'from', nclusters, 'similarity:', sprintf("%.02f", best$ji[1]), "\r", sep=" "))
+    cedges[[i]] = union(cedges[[i]], cedges[[j]])
+    cedges[[j]] = NULL
+    cnodes$cluster[which(cnodes$cluster == j)] = i
+    cnodes$cluster[which(cnodes$cluster > j)] = cnodes$cluster[which(cnodes$cluster > j)] - 1
+    cnodes = cnodes[which(!duplicated(cnodes)),]
+    r = mergeClusters(cedges, cnodes)
+    return(r)
+  }
+
+  return(list(
+    cedges = cedges,
+    cnodes = cnodes
+  ))
+}
+
+mergeCommunities = function(lc){
+
+  cedges = lc$clusters
+  cnodes = lc$nodeclusters
+  cnodes$cluster = as.integer(cnodes$cluster)
+  r = mergeClusters(cedges, cnodes)
+
+  return(r)
 }
