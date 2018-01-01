@@ -59,9 +59,9 @@ loadSampleAnnotations = function (annotation_file, sample_order_file) {
 #'   and the remaining colums correspond to an annotation type.  The rows
 #'   of the anntation columns should contain the annotations.
 #' @export
-graphNet = function(net, osa = data.frame()) {
+graphNet = function(net, osa = data.frame(), sim_col = 'sc') {
   edge_indexes = c(1:length(net$Source));
-  g = graphEdgeList(edge_indexes, net, osa)
+  g = graphEdgeList(edge_indexes, net, sim_col, osa)
   return(g)
 }
 
@@ -78,10 +78,10 @@ graphNet = function(net, osa = data.frame()) {
 #'   of the anntation columns should contain the annotations.
 #'
 #' @export
-graphEdgeList = function(edge_indexes, net, osa = data.frame(), field = NA) {
+graphEdgeList = function(edge_indexes, net, sim_col = 'sc', osa = data.frame(), field = NA) {
 
-  edges = as.vector(unlist(t(net[edge_indexes, c('Source', 'Target')])))
-  g = graph(edges, directed = F)
+  g = graph.edgelist(as.matrix(net[edge_indexes, c('Source', 'Target')]), directed = F)
+  E(g)$weight = abs(net[edge_indexes, sim_col])
 
   # Don't show node labels if we have too many nodes.
   vlc = 1
@@ -110,12 +110,10 @@ graphEdgeList = function(edge_indexes, net, osa = data.frame(), field = NA) {
   # Plot the graph.
   l = layout_with_kk(g)
   plot(g,
-       # Verticies
        vertex.label.color="black", vertex.label.cex = vlc, vertex.size = vs,
-       # Edges
-       edge.color=rep("#AAAAAA", length(edge_indexes)), vertex.color='cyan',
-       # Layout
+       edge.color='black', vertex.color='cyan',
        layout = l)
+
   return(list(
     graph = g,
     layout = l
@@ -302,4 +300,109 @@ plotEdgeList = function(edge_indexes, net, ematrix, cor_col = 'sc', colors = NA,
       return()
     }
   }
+}
+
+#' Finds Linked communities in the network.
+#'
+#' This function generates three output files that it writes to the current
+#' working directory.
+#'
+#' @param net
+#'   A network data frame containing the KINC-produced network.  The loadNetwork
+#'   function imports a dataframe in the correct format for this function.
+#' @param file_prefix
+#'   A prefix to add to the beginning of each file name.
+#' @param module_prefix
+#'   A prefix to add to the beginning of the module names. By deafult this is simply
+#'   the letter 'M'.
+#' @param sim_col
+#'   The column name in the network data frame for the similarity score. Default is 'sc',
+#' @param hcmethod
+#'   A character string naming the hierarchical clustering method to use. Can be one of
+#'   "ward.D", "single", "complete", "average", "mcquitty", "median", or "centroid".
+#'   Defaults to "single".
+#' @param meta
+#'   Indicates if modules should be collapsed into meta-modules. If set to TRUE then
+#'   the linked communities returned are meta modules. Defaults to FALSE.
+#'
+#' @return
+#'   The linked communities object.
+#' @export
+#'
+findLinkedCommunities = function(net, file_prefix, module_prefix = 'M', sim_col = 'sc',
+                                 hcmethod = 'complete', meta = TRUE, ignore_inverse = TRUE) {
+  new_net = net
+  new_net$Module = NA
+
+  # Linked community method doesn't do well with disconnected graphs. So, first we want
+  # to decompose the graph into its disjointed subgraphs:
+  if (ignore_inverse) {
+    g = graph.edgelist(as.matrix(net[which(net[[sim_col]] > 0), c('Source', 'Target')]), directed = F)
+    E(g)$weight = abs(net[which(net[[sim_col]] > 0), sim_col])
+  }
+  else {
+    g = graph.edgelist(as.matrix(net[, c('Source', 'Target')]), directed = F)
+    E(g)$weight = abs(net[, sim_col])
+  }
+  subg = decompose(g,  min.vertices = 30);
+
+  lcs = list()
+
+  # Iterate through the subgraphs and find the communities.
+  for (gi in 1:length(subg)) {
+
+    print(paste('Working on subgraph', gi, 'of', length(subg), '...', sep=" "))
+
+    # We need a large enough subnetwork to find clusters.
+    subnet = as_edgelist(subg[[gi]])
+
+    # Create the Link Community clusters.
+    lc = getLinkCommunities(subnet, hcmethod = hcmethod, removetrivial = FALSE, plot = FALSE)
+
+    # If the meta analysis was selected.
+    if (meta) {
+      mc = meta.communities(lc, hcmethod = 'ward.D2', deepSplit = 4)
+      lc = mc
+    }
+
+    lcs[[gi]] = lc
+
+    # Iterate through all of the edges in the graph and add the module to the
+    # network
+    for (i in 1:nrow(lc$edges)) {
+      node1 = as.character(lc$edges[i,'node1'])
+      node2 = as.character(lc$edges[i,'node2'])
+      cluster = as.integer(lc$edges[i,'cluster'])
+
+      ei = which(new_net$Source == node1 & new_net$Target == node2)
+      if (length(ei) > 0) {
+        module = sprintf("SG%02dM%04d", gi, cluster)
+        new_net[ei,]$Module = module
+      }
+      ei = which(new_net$Target == node1 & new_net$Source == node2)
+      if (length(ei) > 0) {
+        module = sprintf("SG%02dM%04d", gi, cluster)
+        new_net[ei,]$Module = module
+      }
+    }
+  }
+
+
+  # Convert all of the arrays above into a data frame for printing the modules
+  # list.
+  write.table(new_net, file=paste(file_prefix, "coexpnet.edges.lcm.txt", sep=".") ,sep="\t", row.names=FALSE, append=FALSE, quote=FALSE)
+
+  # Write out the node list
+  node_list = data.frame(Node=c(new_net$Source, new_net$Target), Cluster=c(new_net$Module, new_net$Module))
+  write.table(unique(node_list), file=paste(file_prefix, "coexpnet.edges.lcmByNodes.txt", sep=".") ,sep="\t", row.names=FALSE, append=FALSE, quote=FALSE, col.names=FALSE)
+
+
+  # convert the edge and cluster into a report of modules by edge which can
+  # be used for Cytoscape.
+  new_net_edges = cbind(paste(new_net$Source, "(co)", new_net$Target, sep=" "), new_net$Module)
+  colnames(new_net_edges) = c('Edge', 'Module')
+  new_net_edges = new_net_edges[which(!is.na(new_net_edges[,2])),]
+  write.table(new_net_edges, file=paste(file_prefix, "coexpnet.edges.lcm.cys.txt", sep=".") ,sep="\t", row.names=FALSE, append=FALSE, quote=FALSE)
+
+  return(lcs)
 }
