@@ -242,63 +242,6 @@ analyzeEdgeCat = function(i, osa, net, field, correction = 'bonferroni') {
   return(pvals);
 }
 
-#' Performs linear regression of a quantitative traits against a a single edge in the network.
-#'
-#' @param i
-#'   The index of the edge in the network
-#' @param osa
-#'   The sample annotation matrix. One column must contain the header 'Sample'
-#'   and the remaining colums correspond to an annotation type.  The rows
-#'   of the anntation columns should contain the annotations.
-#' @param net
-#'   A network dataframe containing the KINC-produced network.  The loadNetwork
-#'   function imports a dataframe in the correct format for this function.
-#' @param field
-#'   The field in the osa variable on which enrichment will be performed.
-#' @param correction.
-#'   The method to apply for multiple testing correction. Valid values are identical
-#'   to those available to the p.adjust function.  The default is to
-#'   apply 'bonferroni' correction.
-#' @param samples
-#'   Limit the annalysis to only the samples indexes provided.
-#'
-#' @export
-#'
-#' @examples
-#'
-analyzeEdgeQuant = function(i, osa, net, field, samples = c()) {
-  source = net[i, 'Source']
-  target = net[i, 'Target']
-
-  # Convert the sample string to a numerical vector.
-  edge = net[i,]
-  sample_str = edge$Samples
-  edge_samples = as.numeric(strsplit(sample_str, "")[[1]])
-  num_samples = length(edge_samples)
-
-  # If the caller provided a set of samples to focus on then
-  # we want to ignore any that are in the edge but not in the list.
-  if (length(samples) > 0) {
-    edge_samples[which(!(1:num_samples %in% samples))] = 0
-  }
-
-  # Set any value not equal to 1 to be zero.
-  edge_samples[which(edge_samples != 1)] = 0
-
-  # Convert the edge_sample list back to a listo f indexes.
-  edge_samples = which(edge_samples == 1)
-
-  # Build the expression vectors using only the edges of the edge.
-  x = t(ematrix[source, edge_samples])
-  y = t(ematrix[target, edge_samples])
-  z = as.factor(osa[edge_samples, field])
-
-  model = lm(y + x ~ as.numeric(z), data=data.frame(x=x, y=y, z=z))
-  s = summary(model)
-  pval = s$coefficients[2,4]
-  return(pval)
-}
-
 #' Performs significance association of a subnetwork with a field.
 #'
 #' @param net
@@ -388,7 +331,70 @@ analyzeNetCat = function(net, osa, field, correction = 'bonferroni') {
   return(net2);
 }
 
+#' Performs linear regression of a quantitative traits against a a single edge in the network.
+#'
+#' @param i
+#'   The index of the edge in the network
+#' @param osa
+#'   The sample annotation matrix. One column must contain the header 'Sample'
+#'   and the remaining colums correspond to an annotation type.  The rows
+#'   of the anntation columns should contain the annotations.
+#' @param net
+#'   A network dataframe containing the KINC-produced network.  The loadNetwork
+#'   function imports a dataframe in the correct format for this function.
+#' @param field
+#'   The field in the osa variable on which enrichment will be performed.
+#' @param correction.
+#'   The method to apply for multiple testing correction. Valid values are identical
+#'   to those available to the p.adjust function.  The default is to
+#'   apply 'bonferroni' correction.
+#' @param samples
+#'   Limit the annalysis to only the samples indexes provided.
+#'
+#' @export
+#'
+#' @examples
+#'
+analyzeEdgeQuant = function(i, osa, net, field, samples = c()) {
+  source = net[i, 'Source']
+  target = net[i, 'Target']
 
+  # Convert the sample string to a numerical vector.
+  edge = net[i,]
+  sample_str = edge$Samples
+  edge_samples = as.numeric(strsplit(sample_str, "")[[1]])
+  num_samples = length(edge_samples)
+
+  # If the caller provided a set of samples to focus on then
+  # we want to ignore any that are in the edge but not in the list.
+  if (length(samples) > 0) {
+    edge_samples[which(!(1:num_samples %in% samples))] = 0
+  }
+
+  # Set any value not equal to 1 to be zero.
+  edge_samples[which(edge_samples != 1)] = 0
+
+  # Convert the edge_sample list back to a listo f indexes.
+  edge_samples = which(edge_samples == 1)
+
+  # Build the expression vectors using only the edges of the edge.
+  x = t(ematrix[source, edge_samples])
+  y = t(ematrix[target, edge_samples])
+  z = as.factor(osa[edge_samples, field])
+
+  # Use linear regression to obtain a p-value for the association.
+  model = lm(y + x ~ as.numeric(z), data=data.frame(x=x, y=y, z=z))
+  s = summary(model)
+  pval = s$coefficients[2,4]
+
+  # Get the rate of change of the mean of y + x
+  roccm = s$coefficients[2,1]
+
+  return(list(
+    p = pval,
+    roccm = roccm
+  ))
+}
 #' Performs significance association for every edge in the network.
 #'
 #' @param net
@@ -408,12 +414,14 @@ analyzeNetQuant = function(net, osa, field, samples = NA) {
   # Add in new columns for each category.
   net2 = net
   net2[field] = NA
+  net2[paste(field, '_roccm', sep='')] = NA
 
   pb <- txtProgressBar(min = 0, max = nrow(net), style = 3)
   for (i in 1:nrow(net)) {
     setTxtProgressBar(pb, i)
-    p.val = analyzeEdgeQuant(i, osa, net, field, samples)
-    net2[i, field] = p.val
+    result = analyzeEdgeQuant(i, osa, net, field, samples)
+    net2[i, field] = result[['p']]
+    net2[i, paste(field, '_roccm', sep='')] = result[['roccm']]
   }
   close(pb)
   return(net2);

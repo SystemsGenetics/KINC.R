@@ -210,7 +210,7 @@ plot3DPair = function(i, j, osa, ematrix, field, colors = NA, samples = NA) {
 #' @param samples
 #'   Limit the plot to only the samples indexes provided.
 #' @export
-plot3DEdgeList = function(edge_indexes, osa, net, ematrix, field, colors = NA, samples = NA) {
+plot3DEdgeList = function(edge_indexes, osa, net, ematrix, field, label_field = field, colors = NA, samples = NA) {
   rgl.open()
   rgl.bg(color = "white")
 
@@ -231,7 +231,7 @@ plot3DEdgeList = function(edge_indexes, osa, net, ematrix, field, colors = NA, s
     }
 
     plot3d(x, y, z, type = 's', size = 0.5, col = colors, xlab=source, ylab=target, zlab=field)
-    text3d(x, y, z, osa[[field]], adj=c(1, 1))
+    text3d(x, y, z, osa[[label_field]], adj=c(1, 1))
     val = readline(prompt="Press enter to continue to next plot. Press 'q' and enter to quit.")
 
     if(val == 'q') {
@@ -409,7 +409,7 @@ findLinkedCommunities = function(net, file_prefix, module_prefix = 'M', sim_col 
   return(lcs)
 }
 
-mergeClusters = function(cedges, cnodes, th = 0.4) {
+mergeClusters = function(cedges, cnodes, th = 0.5) {
   nclusters = length(cedges)
 
   best = data.frame(i = 0, j = 0, ji = 0)
