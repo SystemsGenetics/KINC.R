@@ -293,7 +293,7 @@ plotEdgeList = function(edge_indexes, net, ematrix, cor_col = 'sc', colors = NA,
       main = paste(main, '; ', 'Clusters: ', net[i, 'Num_Clusters'], sep="")
     }
 
-    plot(x, y, col = colors, main=main)
+    plot(x, y, col=colors, main=main, xlab=source, ylab=target)
     val = readline(prompt="Press enter to continue to next plot. Press 'q' and enter to quit.")
 
     if(val == 'q') {
