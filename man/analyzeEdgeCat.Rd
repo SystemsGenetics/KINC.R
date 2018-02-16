@@ -2,9 +2,10 @@
 % Please edit documentation in R/SSC.R
 \name{analyzeEdgeCat}
 \alias{analyzeEdgeCat}
-\title{Performs enrichment analysis of traits against a a single edge in the network.}
+\title{Performs significant testing of a single edge in the network for a set of annotation categories.}
 \usage{
-analyzeEdgeCat(i, osa, net, field, correction = "bonferroni")
+analyzeEdgeCat(i, osa, net, ematrix, field, test = "binomial",
+  correction = "hochberg", samples = c(), verbose = FALSE)
 }
 \arguments{
 \item{i}{The index of the edge in the network}
@@ -16,14 +17,23 @@ of the anntation columns should contain the annotations.}
 \item{net}{A network dataframe containing the KINC-produced network.  The loadNetwork
 function imports a dataframe in the correct format for this function.}
 
+\item{ematrix}{The expression matrix data frame.}
+
 \item{field}{The field in the osa variable on which enrichment will be performed.}
+
+\item{test}{The statistical test to prform.  This can either be 'fishers' for an enrichment
+test or 'binomial' for a uniqueness test.}
+
+\item{samples}{Limit the analysis to only the samples indexes provided.}
+
+\item{verbose}{Set to TRUE to print execution details.}
 
 \item{correction.}{The method to apply for multiple testing correction. Valid values are identical
 to those available to the p.adjust function.  The default is to
-apply 'bonferroni' correction.}
+apply 'hochberg' correction.}
 }
 \description{
-Performs enrichment analysis of traits against a a single edge in the network.
+Performs significant testing of a single edge in the network for a set of annotation categories.
 }
 \examples{
 

@@ -4,7 +4,8 @@
 \alias{plot3DPair}
 \title{Plots a 3D scatterplot for a given pair of nodes.}
 \usage{
-plot3DPair(i, j, osa, ematrix, field, colors = NA, samples = NA)
+plot3DPair(i, j, osa, ematrix, field, colors = NA, samples = NA,
+  highlight = c())
 }
 \arguments{
 \item{i}{The index of the first node in the expression matrix.}

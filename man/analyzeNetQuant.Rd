@@ -4,7 +4,7 @@
 \alias{analyzeNetQuant}
 \title{Performs significance association for every edge in the network.}
 \usage{
-analyzeNetQuant(net, osa, field, samples = NA)
+analyzeNetQuant(net, osa, field, samples = c())
 }
 \arguments{
 \item{net}{A network data frame containing the KINC-produced network.  The loadNetwork

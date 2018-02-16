@@ -46,6 +46,7 @@ loadSampleAnnotations = function (annotation_file, sample_order_file) {
   sample_order = read.table(sample_order_file, colClasses=c('character'),
                             col.names=c('Sample'))
   osa = merge(sample_order, sample_annots, by = "Sample", sort=FALSE)
+  row.names(osa) = osa$Sample
 
   return(osa)
 }
@@ -171,7 +172,7 @@ highlightEdgeList = function(edge_indexes, graph, layout, net, color) {
 #' @param colors
 #'   An array of colors per sample.
 #' @export
-plot3DPair = function(i, j, osa, ematrix, field, colors = NA, samples = NA) {
+plot3DPair = function(i, j, osa, ematrix, field, colors = NA, samples = NA, highlight = c()) {
   rgl.open()
   rgl.bg(color = "white")
 
@@ -186,7 +187,12 @@ plot3DPair = function(i, j, osa, ematrix, field, colors = NA, samples = NA) {
     z = t(ematrix[j, ])
   }
 
-  plot3d(x, y, z, type = 's', size = 0.5, col = colors)
+  size = rep(0.25, length(x))
+  if (length(highlight) > 0) {
+    size[highlight] = 0.5
+  }
+
+  plot3d(x, y, z, type = 's', size = size, col = colors)
 }
 
 #' Plots a 3D scatterplot for a given list of edges.
@@ -209,19 +215,27 @@ plot3DPair = function(i, j, osa, ematrix, field, colors = NA, samples = NA) {
 #'   An array of colors per sample.
 #' @param samples
 #'   Limit the plot to only the samples indexes provided.
+#' @param highlight
+#'   If set to TRUE then the samples in the edge cluster are drawn larger than the
+#'   other samples in the plot.
 #' @export
-plot3DEdgeList = function(edge_indexes, osa, net, ematrix, field, label_field = field, colors = NA, samples = NA) {
+plot3DEdgeList = function(edge_indexes, osa, net, ematrix, field, label_field = field,
+                          colors = NA, samples = NA, highlight = TRUE) {
   rgl.open()
   rgl.bg(color = "white")
 
   for (i in edge_indexes) {
     source = net[i, 'Source']
     target = net[i, 'Target']
+    sample_indexes = c()
+    if ('Samples' %in% names(net)) {
+      sample_indexes = getEdgeSamples(i, net)
+    }
 
     if (!is.na(samples)) {
       x = t(ematrix[source, samples])
       y = t(ematrix[target, samples])
-      z = as.factor(osa[samples, field])
+      z = as.factor(osa[[field]])
       colors = colors[samples]
     }
     else {
@@ -230,8 +244,18 @@ plot3DEdgeList = function(edge_indexes, osa, net, ematrix, field, label_field = 
       z = as.factor(osa[, field])
     }
 
-    plot3d(x, y, z, type = 's', size = 0.5, col = colors, xlab=source, ylab=target, zlab=field)
-    text3d(x, y, z, osa[[label_field]], adj=c(1, 1))
+    size = rep(0.25, length(x))
+    if (highlight & length(sample_indexes) > 0) {
+      size[sample_indexes] = 0.5
+    }
+
+    main = paste(source, 'vs', target, 'Edge:', i)
+    plot3d(x, y, z, type = 's', main = main, size = size, col = colors, xlab=source, ylab=target, zlab=field, axes=FALSE)
+    box3d()
+    axis3d('x')
+    axis3d('y')
+    axis3d('z', nticks = length(unique(osa[, field])) - 1, labels = unique(osa[[field]]))
+    text3d(x, y, z, osa[names(ematrix), ][[label_field]], adj=c(1, 1))
     val = readline(prompt="Press enter to continue to next plot. Press 'q' and enter to quit.")
 
     if(val == 'q') {

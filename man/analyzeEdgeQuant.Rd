@@ -18,11 +18,7 @@ function imports a dataframe in the correct format for this function.}
 
 \item{field}{The field in the osa variable on which enrichment will be performed.}
 
-\item{samples}{Limit the annalysis to only the samples indexes provided.}
-
-\item{correction.}{The method to apply for multiple testing correction. Valid values are identical
-to those available to the p.adjust function.  The default is to
-apply 'bonferroni' correction.}
+\item{samples}{Limit the analysis to only the samples indexes provided.}
 }
 \description{
 Performs linear regression of a quantitative traits against a a single edge in the network.

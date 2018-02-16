@@ -4,8 +4,8 @@
 \alias{plot3DEdgeList}
 \title{Plots a 3D scatterplot for a given list of edges.}
 \usage{
-plot3DEdgeList(edge_indexes, osa, net, ematrix, field, colors = NA,
-  samples = NA)
+plot3DEdgeList(edge_indexes, osa, net, ematrix, field, label_field = field,
+  colors = NA, samples = NA, highlight = TRUE)
 }
 \arguments{
 \item{edge_indexes}{The index of the edge in the network data frame.}
@@ -25,6 +25,9 @@ into separate layers.}
 \item{colors}{An array of colors per sample.}
 
 \item{samples}{Limit the plot to only the samples indexes provided.}
+
+\item{highlight}{If set to TRUE then the samples in the edge cluster are drawn larger than the
+other samples in the plot.}
 }
 \description{
 Plots a 3D scatterplot for a given list of edges.
