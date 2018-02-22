@@ -224,6 +224,9 @@ plot3DEdgeList = function(edge_indexes, osa, net, ematrix, field, label_field = 
   rgl.open()
   rgl.bg(color = "white")
 
+  # Set the row names to be the sample names.
+  row.names(osa) = osa$Sample
+
   for (i in edge_indexes) {
     source = net[i, 'Source']
     target = net[i, 'Target']
@@ -254,7 +257,7 @@ plot3DEdgeList = function(edge_indexes, osa, net, ematrix, field, label_field = 
     box3d()
     axis3d('x')
     axis3d('y')
-    axis3d('z', nticks = length(unique(osa[, field])) - 1, labels = unique(osa[[field]]))
+    axis3d('z', nticks = length(unique(osa[, field])) - 1, labels = unique(sort(as.factor(osa[[field]]))))
     text3d(x, y, z, osa[names(ematrix), ][[label_field]], adj=c(1, 1))
     val = readline(prompt="Press enter to continue to next plot. Press 'q' and enter to quit.")
 

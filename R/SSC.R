@@ -203,6 +203,7 @@ sampleClusterBTest <- function(category, field, osa, net, ematrix, cluster_sampl
   prob_of_success = num_of_category / length(osa[[field]])
   res = binom.test(c(successes, failures), p=prob_of_success, alternative=alternative, conf.level = 0.99)
   if(verbose) {
+    print(category)
     print(res)
   }
   p.value = res$p.value
