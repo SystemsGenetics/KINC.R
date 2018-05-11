@@ -79,13 +79,13 @@ graphNet = function(net, osa = data.frame(), sim_col = 'sc') {
 #'   of the anntation columns should contain the annotations.
 #'
 #' @export
-graphEdgeList = function(edge_indexes, net, sim_col = 'sc', osa = data.frame(), field = NA) {
+graphEdgeList = function(edge_indexes, net, sim_col = 'sc', osa = data.frame()) {
 
   g = graph.edgelist(as.matrix(net[edge_indexes, c('Source', 'Target')]), directed = F)
   E(g)$weight = abs(net[edge_indexes, sim_col])
 
   # Don't show node labels if we have too many nodes.
-  vlc = 1
+  vlc = 0.5
   vs = 10
   if (length(edge_indexes) > 100) {
     vlc = 0.25
@@ -94,18 +94,6 @@ graphEdgeList = function(edge_indexes, net, sim_col = 'sc', osa = data.frame(), 
   if (length(edge_indexes) > 1000) {
     vlc = 0.001
     vs = 2
-  }
-
-  if (!is.na(field)) {
-    sample_types = as.character(osa[[field]])
-    sample_types[which(sample_types == "null")] = NA
-    sample_types[which(sample_types == "notreported")] = NA
-
-    categories = sort(unique(sample_types[nona.idx]))
-    max = lapply(categories, FUN=function(x) {
-      subname = paste(field, x, sep='_')
-      return(min(net[, c(subname)], na.rm = TRUE))
-    })
   }
 
   # Plot the graph.

@@ -242,8 +242,8 @@ sampleClusterBTest <- function(category, field, osa, net, ematrix, cluster_sampl
 #'
 #' @examples
 #'
-analyzeEdgeCat = function(i, osa, net, ematrix, field, test = 'binomial', correction = 'hochberg',
-                          samples=c(), verbose = FALSE) {
+analyzeEdgeCat = function(i, osa, net, ematrix, field, test = 'binomial',
+                          correction = 'hochberg', samples=c(), verbose = FALSE) {
 
   sample_types = as.character(osa[[field]])
   num_samples = length(sample_types)
@@ -294,8 +294,8 @@ analyzeEdgeCat = function(i, osa, net, ematrix, field, test = 'binomial', correc
 #'   Set to TRUE to print execution details.
 #' @export
 #'
-analyzeNetCat = function(net, osa, ematrix, field, test = 'binomial', correction = 'hochberg',
-                         samples = c(), verbose = FALSE) {
+analyzeNetCat = function(net, osa, ematrix, field, test = 'fishers',
+                         correction = 'hochberg', samples = c(), verbose = FALSE) {
 
   sample_types = as.character(osa[[field]])
   categories = unique(sample_types)

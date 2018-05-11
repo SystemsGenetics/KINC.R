@@ -4,7 +4,7 @@
 \alias{analyzeNetCat}
 \title{Performs significant testing of each edge in the network for a set of annotation categories.}
 \usage{
-analyzeNetCat(net, osa, ematrix, field, test = "binomial",
+analyzeNetCat(net, osa, ematrix, field, test = "fishers",
   correction = "hochberg", samples = c(), verbose = FALSE)
 }
 \arguments{
