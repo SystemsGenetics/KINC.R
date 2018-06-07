@@ -355,6 +355,16 @@ analyzeEdgeQuant = function(i, osa, net, field, samples = c()) {
   y = t(ematrix[target, edge_samples])
   z = as.numeric(as.factor(osa[edge_samples, field]))
 
+  # If our z-dimension only has one value then there's no need to
+  # perform a linear regression, so just return.
+  if (dim(table(z)) == 1) {
+    return(list(
+      p = NA,
+      roccm = NA,
+      model = NA
+    ))
+  }
+
   # Use linear regression to obtain a p-value for the association.
   model = lm(y + x ~ z, data=data.frame(x=x, y=y, z=z))
   s = summary(model)

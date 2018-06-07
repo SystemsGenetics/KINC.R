@@ -226,7 +226,7 @@ plot3DEdgeList = function(edge_indexes, osa, net, ematrix, field, label_field = 
     if (!is.na(samples)) {
       x = t(ematrix[source, samples])
       y = t(ematrix[target, samples])
-      z = as.factor(osa[[field]])
+      z = as.factor(osa[[field]][samples])
       colors = colors[samples]
     }
     else {
@@ -246,7 +246,12 @@ plot3DEdgeList = function(edge_indexes, osa, net, ematrix, field, label_field = 
     axis3d('x')
     axis3d('y')
     axis3d('z', nticks = length(unique(osa[, field])) - 1, labels = unique(sort(as.factor(osa[[field]]))))
-    text3d(x, y, z, osa[names(ematrix), ][[label_field]], adj=c(1, 1))
+    if (!is.na(samples)) {
+      text3d(x, y, z, osa[names(ematrix[samples]), ][[label_field]], adj=c(1, 1))
+    }
+    else {
+      text3d(x, y, z, osa[names(ematrix), ][[label_field]], adj=c(1, 1))
+    }
     val = readline(prompt="Press enter to continue to next plot. Press 'q' and enter to quit.")
 
     if(val == 'q') {
@@ -375,7 +380,10 @@ findLinkedCommunities = function(net, file_prefix, module_prefix = 'M', sim_col 
     # Create the Link Community clusters.
     lc = getLinkCommunities(subnet, hcmethod = hcmethod, removetrivial = FALSE, plot = FALSE)
 
-    # If the meta analysis was selected.
+    # If the meta analysis was selected. Rather than use the cluster merging
+    # function that comes with LCM we perform our own. This is because the
+    # heirarchical clustering method of LCM improperly merges some clusters that
+    # are not connected.
     if (meta) {
       r = mergeCommunities(lc)
     }
@@ -424,10 +432,41 @@ findLinkedCommunities = function(net, file_prefix, module_prefix = 'M', sim_col 
   return(lcs)
 }
 
+#' Merges linked community clusters that have the most similar sets of nodes.
+#'
+#' This merging function recursively iterates through all of the clusters
+#' and performs a pair-wse Jaccard comparision between all clusters.
+#' Those with the highest Jaccard score that are above the given
+#' threshold (i.e. deafult of 0.5) are candidates for merging.
+#'
+#' This is a helper function for the findLinkedCommunities() function and is
+#' not meant to be called on its own.
+#'
+#' @param lc
+#'   A linkcomm object.
+#'
+#' @return
+#'   A list were each element of the list is the
+#'   set of nodes and edges of the merged clusters.
+
+mergeCommunities = function(lc){
+
+  cedges = lc$clusters
+  cnodes = lc$nodeclusters
+  cnodes$cluster = as.integer(cnodes$cluster)
+  r = mergeClusters(cedges, cnodes)
+
+  return(r)
+}
+
+#' The recursive merging function called by mergeCommunities().
+#'
 mergeClusters = function(cedges, cnodes, th = 0.5) {
   nclusters = length(cedges)
 
+  # Create a dataframe for storing the best pairwise Jaccard similarity scores.
   best = data.frame(i = 0, j = 0, ji = 0)
+
   for (i in 1:nclusters) {
     if (best$ji[1] == 1) next
     for (j in 1:nclusters) {
@@ -472,12 +511,4 @@ mergeClusters = function(cedges, cnodes, th = 0.5) {
   ))
 }
 
-mergeCommunities = function(lc){
 
-  cedges = lc$clusters
-  cnodes = lc$nodeclusters
-  cnodes$cluster = as.integer(cnodes$cluster)
-  r = mergeClusters(cedges, cnodes)
-
-  return(r)
-}
