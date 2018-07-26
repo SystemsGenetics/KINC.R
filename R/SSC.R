@@ -292,10 +292,14 @@ analyzeEdgeCat = function(i, osa, net, ematrix, field, test = 'binomial',
 #'   Limit the analysis to only the samples indexes provided.
 #' @param verbose
 #'   Set to TRUE to print execution details.
+#' @param progressBar
+#'   Set to FALSE to repress progress bar
+#'   
 #' @export
 #'
 analyzeNetCat = function(net, osa, ematrix, field, test = 'fishers',
-                         correction = 'hochberg', samples = c(), verbose = FALSE) {
+                         correction = 'hochberg', samples = c(), 
+                         verbose = FALSE, progressBar = TRUE ) {
 
   sample_types = as.character(osa[[field]])
   categories = unique(sample_types)
@@ -306,10 +310,10 @@ analyzeNetCat = function(net, osa, ematrix, field, test = 'fishers',
     subname = paste(field, category, sep='_')
     net2[subname] = NA
   }
-
-  pb <- txtProgressBar(min = 0, max = nrow(net), style = 3)
+  
+  if (progressBar){pb <- txtProgressBar(min = 0, max = nrow(net), style = 3)}
   for (i in 1:nrow(net)) {
-    setTxtProgressBar(pb, i)
+    if (progressBar){setTxtProgressBar(pb, i)}
     p.vals = analyzeEdgeCat(i, osa, net, ematrix, field, test = test, verbose = verbose,
                             correction = correction, samples = samples)
     for (category in names(p.vals)) {
@@ -317,7 +321,10 @@ analyzeNetCat = function(net, osa, ematrix, field, test = 'fishers',
       net2[i, subname] = p.vals[category]
     }
   }
-  close(pb)
+  if (progressBar){close(pb)}
+
+  
+  
   return(net2);
 }
 #' Performs linear regression of a quantitative traits against a a single edge in the network.
@@ -391,41 +398,45 @@ analyzeEdgeQuant = function(i, osa, net, field, samples = c()) {
 #'   The field in the osa variable on which enrichment will be performed.
 #' @param samples
 #'   Limit the annalysis to only the samples indexes provided.
-#'
+#' @param progressBar
+#'   Set to FALSE to repress progress bar
+#'  
 #' @export
 #'
-analyzeNetQuant = function(net, osa, field, samples = c()) {
+analyzeNetQuant = function(net, osa, field, samples = c(), progressBar = TRUE) {
 
   # Add in new columns for each category.
   net2 = net
   net2[field] = NA
   net2[paste(field, '_roccm', sep='')] = NA
 
-  pb <- txtProgressBar(min = 0, max = nrow(net), style = 3)
+  if(progressBar){pb <- txtProgressBar(min = 0, max = nrow(net), style = 3)}
   for (i in 1:nrow(net)) {
-    setTxtProgressBar(pb, i)
+    if (progressBar){setTxtProgressBar(pb, i)}
     result = analyzeEdgeQuant(i, osa, net, field, samples)
     net2[i, field] = result[['p']]
     net2[i, paste(field, '_roccm', sep='')] = result[['roccm']]
   }
-  close(pb)
+  if (progressBar){close(pb)}
   return(net2);
 }
 
-analyzeNetDiffQuant = function(net, osa, field, model_samples = NA, test_samples) {
+analyzeNetDiffQuant = function(net, osa, field, model_samples = NA, test_samples, 
+                               progressBar = FALSE) {
 
   # Add in new columns for each category.
   net2 = net
   column_name = paste(field, 'diff', paste(test_samples, collapse='_'), sep="-")
   net2[column_name] = NA
-
-  pb <- txtProgressBar(min = 0, max = nrow(net), style = 3)
+  
+  if(progressBar){pb <- txtProgressBar(min = 0, max = nrow(net), style = 3)}
   for (i in 1:nrow(net)) {
-    setTxtProgressBar(pb, i)
+    if (progressBar){setTxtProgressBar(pb, i)}
     result = analyzeEdgeDiffQuant(i, osa, net, field, model_samples, test_samples)
     net2[i, column_name] = median(result)
   }
-  close(pb)
+  if (progressBar){close(pb)}
+
   return(net2);
 }
 
