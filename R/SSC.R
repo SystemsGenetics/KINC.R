@@ -211,6 +211,50 @@ sampleClusterBTest <- function(category, field, osa, net, ematrix, cluster_sampl
   return(p.value)
 }
 
+#  Contingency matrix for each category in a cluster:
+#
+#                   Is Cat  Not Cat    Totals
+#                  ------------------
+#  In Cluster      |  n11   |   n12   | n1p
+#  Not in Cluster  |  n21   |   n22   | n2p
+#                  ------------------
+#  Totals             np1       np2     npp
+#
+
+##########################################################################
+#' Performs logistic regression for a set of Cluster samples
+#'
+sampleClusterlogit <- function(category, field, osa, net, ematrix,cluster_samples){
+  num_categories = unique(osa[[field]])
+  osa_cat_indexes = which(osa$Sample %in% names(ematrix)[cluster_samples])
+  osa_out_indexes = which(!osa$Sample %in% names(ematrix)[cluster_samples])
+  n11 = length(which(osa[[field]][osa_cat_indexes] == category))
+  n12 = length(which(osa[[field]][osa_cat_indexes] != category))
+  n21 = length(which(osa[[field]][osa_out_indexes] == category))
+  n22 = length(which(osa[[field]][osa_out_indexes] != category))
+
+  contmatrix = matrix(
+    as.numeric(c(n11, n21, n12, n22)),
+    nr=2,
+    dimnames = list(
+      In_Cluster = c("Yes", "No"),
+      Is_Category = c("Yes", "No")
+    )
+  )
+
+
+  xfactor = factor(c("Yes","No"))
+  logitreg = glm(contmatrix ~ xfactor, family = binomial("logit"))
+  summ = summary(logitreg)
+  p.val = summ$coefficients[2,4]
+  return(p.val)
+
+}
+#######################################################################################################
+
+
+
+
 
 #' Performs significant testing of a single edge in the network for a set of annotation categories.
 #'
@@ -268,6 +312,12 @@ analyzeEdgeCat = function(i, osa, net, ematrix, field, test = 'binomial',
     names(pvals) = categories
     return(pvals);
   }
+  if(test == 'logit'){
+    pvals = sapply(categories,sampleClusterlogit, field, osa, net, ematrix, edge_samples)
+    names(pvals) = categories
+    return(pvals);
+  }
+
 }
 
 #' Performs significant testing of each edge in the network for a set of annotation categories.
@@ -294,11 +344,11 @@ analyzeEdgeCat = function(i, osa, net, ematrix, field, test = 'binomial',
 #'   Set to TRUE to print execution details.
 #' @param progressBar
 #'   Set to FALSE to repress progress bar
-#'   
+#'
 #' @export
 #'
 analyzeNetCat = function(net, osa, ematrix, field, test = 'fishers',
-                         correction = 'hochberg', samples = c(), 
+                         correction = 'hochberg', samples = c(),
                          verbose = FALSE, progressBar = TRUE ) {
 
   sample_types = as.character(osa[[field]])
@@ -310,7 +360,7 @@ analyzeNetCat = function(net, osa, ematrix, field, test = 'fishers',
     subname = paste(field, category, sep='_')
     net2[subname] = NA
   }
-  
+
   if (progressBar){pb <- txtProgressBar(min = 0, max = nrow(net), style = 3)}
   for (i in 1:nrow(net)) {
     if (progressBar){setTxtProgressBar(pb, i)}
@@ -323,8 +373,8 @@ analyzeNetCat = function(net, osa, ematrix, field, test = 'fishers',
   }
   if (progressBar){close(pb)}
 
-  
-  
+
+
   return(net2);
 }
 #' Performs linear regression of a quantitative traits against a a single edge in the network.
@@ -400,7 +450,7 @@ analyzeEdgeQuant = function(i, osa, net, field, samples = c()) {
 #'   Limit the annalysis to only the samples indexes provided.
 #' @param progressBar
 #'   Set to FALSE to repress progress bar
-#'  
+#'
 #' @export
 #'
 analyzeNetQuant = function(net, osa, field, samples = c(), progressBar = TRUE) {
@@ -421,14 +471,14 @@ analyzeNetQuant = function(net, osa, field, samples = c(), progressBar = TRUE) {
   return(net2);
 }
 
-analyzeNetDiffQuant = function(net, osa, field, model_samples = NA, test_samples, 
+analyzeNetDiffQuant = function(net, osa, field, model_samples = NA, test_samples,
                                progressBar = FALSE) {
 
   # Add in new columns for each category.
   net2 = net
   column_name = paste(field, 'diff', paste(test_samples, collapse='_'), sep="-")
   net2[column_name] = NA
-  
+
   if(progressBar){pb <- txtProgressBar(min = 0, max = nrow(net), style = 3)}
   for (i in 1:nrow(net)) {
     if (progressBar){setTxtProgressBar(pb, i)}
