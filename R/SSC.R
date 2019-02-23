@@ -192,7 +192,7 @@ sampleClusterFTest = function(category, field, osa, net, ematrix, cluster_sample
 #' @param verbose
 #'   Set to TRUE to print verbose execution details.
 sampleClusterBTest <- function(category, field, osa, net, ematrix, cluster_samples,
-                               correction = 'hochberg', alternative = 'less', verbose = FALSE) {
+                               correction = 'hochberg', alternative = 'greater', verbose = FALSE) {
   osa_cat_indexes = which(osa$Sample %in% names(ematrix)[cluster_samples])
   osa_out_indexes = which(!osa$Sample %in% names(ematrix)[cluster_samples])
 
@@ -204,6 +204,7 @@ sampleClusterBTest <- function(category, field, osa, net, ematrix, cluster_sampl
   res = binom.test(c(successes, failures), p=prob_of_success, alternative=alternative, conf.level = 0.99)
   if(verbose) {
     print(category)
+    print(alternative)
     print(res)
   }
   p.value = res$p.value
@@ -264,7 +265,7 @@ analyzeEdgeCat = function(i, osa, net, ematrix, field, test = 'binomial',
   }
   if (test == 'binomial') {
     pvals = sapply(categories, sampleClusterBTest, field, osa, net, ematrix, edge_samples,
-                   verbose = verbose, correction = correction, alternative = 'less')
+                   verbose = verbose, correction = correction, alternative = 'greater')
     names(pvals) = categories
     return(pvals);
   }
@@ -294,11 +295,11 @@ analyzeEdgeCat = function(i, osa, net, ematrix, field, test = 'binomial',
 #'   Set to TRUE to print execution details.
 #' @param progressBar
 #'   Set to FALSE to repress progress bar
-#'   
+#'
 #' @export
 #'
 analyzeNetCat = function(net, osa, ematrix, field, test = 'fishers',
-                         correction = 'hochberg', samples = c(), 
+                         correction = 'hochberg', samples = c(),
                          verbose = FALSE, progressBar = TRUE ) {
 
   sample_types = as.character(osa[[field]])
@@ -310,7 +311,7 @@ analyzeNetCat = function(net, osa, ematrix, field, test = 'fishers',
     subname = paste(field, category, sep='_')
     net2[subname] = NA
   }
-  
+
   if (progressBar){pb <- txtProgressBar(min = 0, max = nrow(net), style = 3)}
   for (i in 1:nrow(net)) {
     if (progressBar){setTxtProgressBar(pb, i)}
@@ -323,8 +324,8 @@ analyzeNetCat = function(net, osa, ematrix, field, test = 'fishers',
   }
   if (progressBar){close(pb)}
 
-  
-  
+
+
   return(net2);
 }
 #' Performs linear regression of a quantitative traits against a a single edge in the network.
@@ -400,7 +401,7 @@ analyzeEdgeQuant = function(i, osa, net, field, samples = c()) {
 #'   Limit the annalysis to only the samples indexes provided.
 #' @param progressBar
 #'   Set to FALSE to repress progress bar
-#'  
+#'
 #' @export
 #'
 analyzeNetQuant = function(net, osa, field, samples = c(), progressBar = TRUE) {
@@ -421,14 +422,14 @@ analyzeNetQuant = function(net, osa, field, samples = c(), progressBar = TRUE) {
   return(net2);
 }
 
-analyzeNetDiffQuant = function(net, osa, field, model_samples = NA, test_samples, 
+analyzeNetDiffQuant = function(net, osa, field, model_samples = NA, test_samples,
                                progressBar = FALSE) {
 
   # Add in new columns for each category.
   net2 = net
   column_name = paste(field, 'diff', paste(test_samples, collapse='_'), sep="-")
   net2[column_name] = NA
-  
+
   if(progressBar){pb <- txtProgressBar(min = 0, max = nrow(net), style = 3)}
   for (i in 1:nrow(net)) {
     if (progressBar){setTxtProgressBar(pb, i)}
