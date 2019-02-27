@@ -223,7 +223,7 @@ sampleClusterBTest <- function(category, field, osa, net, ematrix, cluster_sampl
 
 ##########################################################################
 #' Performs logistic regression for a set of Cluster samples
-#'
+#' This uses the
 sampleClusterlogit <- function(category, field, osa, net, ematrix,cluster_samples){
   num_categories = unique(osa[[field]])
   osa_cat_indexes = which(osa$Sample %in% names(ematrix)[cluster_samples])
@@ -251,7 +251,40 @@ sampleClusterlogit <- function(category, field, osa, net, ematrix,cluster_sample
 
 }
 #######################################################################################################
+## Multinomial Test
+sampleClusterMTest = function(category, field, osa, net, ematrix, cluster_samples,verbose = FALSE)`{
 
+  osa_cat_indexes = which(osa$Sample %in% names(ematrix)[cluster_samples])
+  osa_out_indexes = which(!osa$Sample %in% names(ematrix)[cluster_samples])
+
+  categories = unique(osa[[field]])
+  num_categories = length(categories)
+
+  prob_of_success <- array(0,c(1,num_categories))   # prob of success for each category
+
+  for (category in categories) {                    # calculating the prob. of success for each category
+    num_of_category = length(which(osa[[field]] == category))
+    prob_of_success[category] = num_of_category / length(osa[[field]])
+  }
+
+  observed <- array(0,c(1,num_categories))
+
+  for(category in categories){
+    observed[category] = length(which(osa[[field]][osa_cat_indexes] == category))
+  }
+
+  res = multinomial.test(observed,prob_of_success,useChisq = TRUE)
+  if(verbose){
+    print(category)
+    print(res)
+  }
+
+
+
+
+
+
+}
 
 
 
