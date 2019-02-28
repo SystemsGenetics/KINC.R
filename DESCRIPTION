@@ -13,4 +13,6 @@ Imports:
   plotrix,
   igraph,
   rgl,
-  linkcomm
+  linkcomm,
+  EMT
+ 

@@ -119,8 +119,7 @@ getSampleMatrix = function(net) {
 #'   "greater" or "less". You can specify just the initial letter.
 #' @param verbose
 #'   Set to TRUE to print verbose execution details.
-sampleClusterFTest = function(category, field, osa, net, ematrix, cluster_samples,
-                              correction = 'hochberg', alternative = 'greater', verbose = FALSE) {
+sampleClusterFTest = function(category, field, osa, net, ematrix, cluster_samples, alternative = 'greater') {
 
   #  Contingency matrix for each category in a cluster:
   #
@@ -147,16 +146,11 @@ sampleClusterFTest = function(category, field, osa, net, ematrix, cluster_sample
       Is_Category = c("Yes", "No")
     )
   )
-  if (verbose) {
-    print(category)
-    print(contmatrix)
-  }
   res = fisher.test(contmatrix, alternative = alternative)
   if (verbose) {
     print(res)
   }
   p.value = res$p.value
-  p.value = p.adjust(p.value, method=correction, n=length(num_categories))
   return(p.value)
 }
 #' Performs a Binomial test on a set of network edge sample cluster.
@@ -191,8 +185,7 @@ sampleClusterFTest = function(category, field, osa, net, ematrix, cluster_sample
 #'   "greater" or "less". You can specify just the initial letter. The default is 'less'
 #' @param verbose
 #'   Set to TRUE to print verbose execution details.
-sampleClusterBTest <- function(category, field, osa, net, ematrix, cluster_samples,
-                               correction = 'hochberg', alternative = 'greater', verbose = FALSE) {
+sampleClusterBTest <- function(category, field, osa, net, ematrix, cluster_samples, alternative = 'greater') {
   osa_cat_indexes = which(osa$Sample %in% names(ematrix)[cluster_samples])
   osa_out_indexes = which(!osa$Sample %in% names(ematrix)[cluster_samples])
 
@@ -202,13 +195,74 @@ sampleClusterBTest <- function(category, field, osa, net, ematrix, cluster_sampl
   num_of_category = length(which(osa[[field]] == category))
   prob_of_success = num_of_category / length(osa[[field]])
   res = binom.test(c(successes, failures), p=prob_of_success, alternative=alternative, conf.level = 0.99)
-  if(verbose) {
-    print(category)
-    print(alternative)
-    print(res)
-  }
   p.value = res$p.value
-  p.value = p.adjust(p.value, method=correction, n=length(num_categories))
+  return(p.value)
+}
+
+#  Contingency matrix for each category in a cluster:
+#
+#                   Is Cat  Not Cat    Totals
+#                  ------------------
+#  In Cluster      |  n11   |   n12   | n1p
+#  Not in Cluster  |  n21   |   n22   | n2p
+#                  ------------------
+#  Totals             np1       np2     npp
+#
+
+##########################################################################
+#' Performs logistic regression for a set of Cluster samples
+#' This uses the
+sampleClusterlogit <- function(category, field, osa, net, ematrix, cluster_samples){
+  num_categories = unique(osa[[field]])
+  osa_cat_indexes = which(osa$Sample %in% names(ematrix)[cluster_samples])
+  osa_out_indexes = which(!osa$Sample %in% names(ematrix)[cluster_samples])
+  n11 = length(which(osa[[field]][osa_cat_indexes] == category))
+  n12 = length(which(osa[[field]][osa_cat_indexes] != category))
+  n21 = length(which(osa[[field]][osa_out_indexes] == category))
+  n22 = length(which(osa[[field]][osa_out_indexes] != category))
+
+  contmatrix = matrix(
+    as.numeric(c(n11, n21, n12, n22)),
+    nr=2,
+    dimnames = list(
+      In_Cluster = c("Yes", "No"),
+      Is_Category = c("Yes", "No")
+    )
+  )
+
+
+  xfactor = factor(c("Yes","No"))
+  logitreg = glm(contmatrix ~ xfactor, family = binomial("logit"))
+  summ = summary(logitreg)
+  p.val = summ$coefficients[2,4]
+  return(p.val)
+
+}
+#######################################################################################################
+## Multinomial Test
+sampleClusterMTest = function(category, field, osa, net, ematrix, cluster_samples) {
+
+  osa_cat_indexes = which(osa$Sample %in% names(ematrix)[cluster_samples])
+  osa_out_indexes = which(!osa$Sample %in% names(ematrix)[cluster_samples])
+
+  categories = unique(osa[[field]])
+  num_categories = length(categories)
+
+  # Calculating the prob. of success for each category.
+  prob_of_success <- vector()
+  for (category in categories) {
+    num_of_category = length(which(osa[[field]] == category))
+    prob_of_success[category] = num_of_category / length(osa[[field]])
+  }
+
+  # Count the number of observed.
+  observed <- vector()
+  for(category in categories) {
+    observed[category] = length(which(osa[[field]][osa_cat_indexes] == category))
+  }
+
+  res = multinomial.test(observed, prob_of_success, MonteCarlo = TRUE)
+  p.value = res$p.value
   return(p.value)
 }
 
@@ -243,8 +297,7 @@ sampleClusterBTest <- function(category, field, osa, net, ematrix, cluster_sampl
 #'
 #' @examples
 #'
-analyzeEdgeCat = function(i, osa, net, ematrix, field, test = 'binomial',
-                          correction = 'hochberg', samples=c(), verbose = FALSE) {
+analyzeEdgeCat = function(i, osa, net, ematrix, field, test = 'binomial', samples=c(), verbose = FALSE) {
 
   sample_types = as.character(osa[[field]])
   num_samples = length(sample_types)
@@ -258,17 +311,21 @@ analyzeEdgeCat = function(i, osa, net, ematrix, field, test = 'binomial',
   categories = unique(osa[[field]])
 
   if (test == 'fishers') {
-    pvals = sapply(categories, sampleClusterFTest, field, osa, net, ematrix, edge_samples,
-                 correction, verbose = verbose, alternative = 'greater')
+    pvals = sapply(categories, sampleClusterFTest, field, osa, net, ematrix, edge_samples, alternative = 'greater')
     names(pvals) = categories
     return(pvals);
   }
   if (test == 'binomial') {
-    pvals = sapply(categories, sampleClusterBTest, field, osa, net, ematrix, edge_samples,
-                   verbose = verbose, correction = correction, alternative = 'greater')
+    pvals = sapply(categories, sampleClusterBTest, field, osa, net, ematrix, edge_samples, alternative = 'greater')
     names(pvals) = categories
     return(pvals);
   }
+  if(test == 'logit'){
+    pvals = sapply(categories,sampleClusterlogit, field, osa, net, ematrix, edge_samples)
+    names(pvals) = categories
+    return(pvals);
+  }
+
 }
 
 #' Performs significant testing of each edge in the network for a set of annotation categories.
@@ -298,9 +355,8 @@ analyzeEdgeCat = function(i, osa, net, ematrix, field, test = 'binomial',
 #'
 #' @export
 #'
-analyzeNetCat = function(net, osa, ematrix, field, test = 'fishers',
-                         correction = 'hochberg', samples = c(),
-                         verbose = FALSE, progressBar = TRUE ) {
+analyzeNetCat = function(net, osa, ematrix, field, test = 'binomial',
+                         correction = 'hochberg', samples = c(), progressBar = TRUE ) {
 
   sample_types = as.character(osa[[field]])
   categories = unique(sample_types)
@@ -315,8 +371,7 @@ analyzeNetCat = function(net, osa, ematrix, field, test = 'fishers',
   if (progressBar){pb <- txtProgressBar(min = 0, max = nrow(net), style = 3)}
   for (i in 1:nrow(net)) {
     if (progressBar){setTxtProgressBar(pb, i)}
-    p.vals = analyzeEdgeCat(i, osa, net, ematrix, field, test = test, verbose = verbose,
-                            correction = correction, samples = samples)
+    p.vals = analyzeEdgeCat(i, osa, net, ematrix, field, test = test, samples = samples)
     for (category in names(p.vals)) {
       subname = paste(field, category, sep='_')
       net2[i, subname] = p.vals[category]
@@ -324,7 +379,11 @@ analyzeNetCat = function(net, osa, ematrix, field, test = 'fishers',
   }
   if (progressBar){close(pb)}
 
-
+  # Perform multiple testing correction on the p-values
+  for (category in categories) {
+    subname = paste(field, category, sep='_')
+    net2[subname] = p.adjust(as.numeric(unlist(net2[subname])), method=correction)
+  }
 
   return(net2);
 }
