@@ -4,8 +4,8 @@
 \alias{plot3DEdgeList}
 \title{Plots a 3D scatterplot for a given list of edges.}
 \usage{
-plot3DEdgeList(edge_indexes, osa, net, ematrix, field, label_field = field,
-  colors = NA, samples = NA, highlight = TRUE)
+plot3DEdgeList(edge_indexes, osa, net, ematrix, field,
+  label_field = field, colors = NA, samples = NA, highlight = TRUE)
 }
 \arguments{
 \item{edge_indexes}{The index of the edge in the network data frame.}

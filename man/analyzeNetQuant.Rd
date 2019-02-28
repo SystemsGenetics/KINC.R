@@ -4,7 +4,7 @@
 \alias{analyzeNetQuant}
 \title{Performs significance association for every edge in the network.}
 \usage{
-analyzeNetQuant(net, osa, field, samples = c())
+analyzeNetQuant(net, osa, field, samples = c(), progressBar = TRUE)
 }
 \arguments{
 \item{net}{A network data frame containing the KINC-produced network.  The loadNetwork
@@ -15,6 +15,8 @@ function imports a dataframe in the correct format for this function.}
 \item{field}{The field in the osa variable on which enrichment will be performed.}
 
 \item{samples}{Limit the annalysis to only the samples indexes provided.}
+
+\item{progressBar}{Set to FALSE to repress progress bar}
 }
 \description{
 Performs significance association for every edge in the network.

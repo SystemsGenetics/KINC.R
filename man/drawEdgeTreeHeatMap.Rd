@@ -4,7 +4,8 @@
 \alias{drawEdgeTreeHeatMap}
 \title{Draws a heatmap with dendrogram with clusters identified.}
 \usage{
-drawEdgeTreeHeatMap(sampleMatrix, tree, osa, fieldOrder, outfile_prefix = NA)
+drawEdgeTreeHeatMap(sampleMatrix, tree, osa, fieldOrder,
+  outfile_prefix = NA)
 }
 \arguments{
 \item{sampleMatrix}{The sample matrix as created by the getSampleMatrix() function.}

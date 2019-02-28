@@ -4,8 +4,9 @@
 \alias{findLinkedCommunities}
 \title{Finds Linked communities in the network.}
 \usage{
-findLinkedCommunities(net, file_prefix, module_prefix = "M", sim_col = "sc",
-  hcmethod = "complete", meta = TRUE, ignore_inverse = TRUE)
+findLinkedCommunities(net, file_prefix, module_prefix = "M",
+  sim_col = "sc", hcmethod = "complete", meta = TRUE,
+  ignore_inverse = TRUE)
 }
 \arguments{
 \item{net}{A network data frame containing the KINC-produced network.  The loadNetwork

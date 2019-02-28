@@ -5,7 +5,8 @@
 \title{Performs significant testing of each edge in the network for a set of annotation categories.}
 \usage{
 analyzeNetCat(net, osa, ematrix, field, test = "fishers",
-  correction = "hochberg", samples = c(), verbose = FALSE)
+  correction = "hochberg", samples = c(), verbose = FALSE,
+  progressBar = TRUE)
 }
 \arguments{
 \item{net}{A network data frame containing the KINC-produced network.  The loadNetwork
@@ -23,6 +24,8 @@ test or 'binomial' for a uniqueness test.}
 \item{samples}{Limit the analysis to only the samples indexes provided.}
 
 \item{verbose}{Set to TRUE to print execution details.}
+
+\item{progressBar}{Set to FALSE to repress progress bar}
 
 \item{correction.}{The method to apply for multiple testing correction. Valid values are identical
 to those available to the p.adjust function.  The default is to
