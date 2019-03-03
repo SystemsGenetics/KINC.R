@@ -4,9 +4,8 @@
 \alias{analyzeNetCat}
 \title{Performs significant testing of each edge in the network for a set of annotation categories.}
 \usage{
-analyzeNetCat(net, osa, ematrix, field, test = "fishers",
-  correction = "hochberg", samples = c(), verbose = FALSE,
-  progressBar = TRUE)
+analyzeNetCat(net, osa, ematrix, field, test = "binomial",
+  correction = "hochberg", samples = c(), progressBar = TRUE)
 }
 \arguments{
 \item{net}{A network data frame containing the KINC-produced network.  The loadNetwork
@@ -22,8 +21,6 @@ function imports a dataframe in the correct format for this function.}
 test or 'binomial' for a uniqueness test.}
 
 \item{samples}{Limit the analysis to only the samples indexes provided.}
-
-\item{verbose}{Set to TRUE to print execution details.}
 
 \item{progressBar}{Set to FALSE to repress progress bar}
 

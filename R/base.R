@@ -215,7 +215,12 @@ plot3DEdgeList = function(edge_indexes, osa, net, ematrix, field, label_field = 
   # Set the row names to be the sample names.
   row.names(osa) = osa$Sample
 
-  for (i in edge_indexes) {
+  # Loop until the user decides to leave.
+  j = 1
+  done = FALSE;
+  while (!done) {
+    i = edge_indexes[j]
+
     source = net[i, 'Source']
     target = net[i, 'Target']
     sample_indexes = c()
@@ -242,20 +247,35 @@ plot3DEdgeList = function(edge_indexes, osa, net, ematrix, field, label_field = 
 
     main = paste(source, 'vs', target, 'Edge:', i)
     plot3d(x, y, z, type = 's', main = main, size = size, col = colors, xlab=source, ylab=target, zlab=field, axes=FALSE)
+    z_labels = unique(sort(as.factor(osa[[field]])))
     box3d()
     axis3d('x')
     axis3d('y')
-    axis3d('z', nticks = length(unique(osa[, field])) - 1, labels = unique(sort(as.factor(osa[[field]]))))
+    axis3d('z', nticks = length(unique(osa[, field])) - 1, labels = z_labels)
     if (!is.na(samples)) {
       text3d(x, y, z, osa[names(ematrix[samples]), ][[label_field]], adj=c(1, 1))
     }
     else {
       text3d(x, y, z, osa[names(ematrix), ][[label_field]], adj=c(1, 1))
     }
-    val = readline(prompt="Press enter to continue to next plot. Press 'q' and enter to quit.")
 
+    # add legend
+    #legend3d("topright", legend = paste('Type', c('A', 'B', 'C')), pch = 16, col = rainbow(3), cex=1, inset=c(0.02))
+
+    # Use the key press to navigate through the images.
+    val = readline(prompt="Type control keys the [enter]. Keys: n > forward, b > backwards, q > quit.")
+    if (val == 'n') {
+      if (j < length(edge_indexes)) {
+        j = j + 1;
+      }
+    }
+    if (val == 'b') {
+      if (j > 1) {
+        j = j - 1
+      }
+    }
     if(val == 'q') {
-      return()
+      done = TRUE
     }
   }
 }
@@ -264,60 +284,75 @@ plot3DEdgeList = function(edge_indexes, osa, net, ematrix, field, label_field = 
 #'
 #' @param edge_indexes
 #'   The index of the edge in the network data frame.
+#' @param osa
+#'   The sample annotation matrix. One column must contain the header 'Sample'
+#'   and the remaining colums correspond to an annotation type.  The rows
+#'   of the anntation columns should contain the annotations.
 #' @param net
 #'   A network data frame containing the KINC-produced network.  The loadNetwork
 #'   function imports a dataframe in the correct format for this function.
 #' @param ematrix
 #'   The expression matrix.
-#' @param cor_col
-#'   Then name of the column in the net argument that provides the similarity score.
-#' @param colors
-#'   An array of colors per sample.
+#' @param field
+#'   The field in the sample annotation matrix by which to split the points
+#'   into separate layers.
 #' @param samples
 #'   An array of sample names for which the scatterplot should be included in the plot.
 #'   If no value is provided then all samples with values are included.
 #' @export
-plotEdgeList = function(edge_indexes, net, ematrix, cor_col = 'sc', colors = NA, samples = NA) {
-  for (i in edge_indexes) {
+plot2DEdgeList = function(edge_indexes, osa, net, ematrix,
+                          field = NA, samples = NA) {
+  j = 1
+  done = FALSE;
+  while (!done) {
+    i = edge_indexes[j]
     source = net[i, 'Source']
     target = net[i, 'Target']
+    sample_indexes = c()
+    if ('Samples' %in% names(net)) {
+      sample_indexes = getEdgeSamples(i, net)
+    }
 
     if (!is.na(samples)) {
       x = t(ematrix[source, samples])
       y = t(ematrix[target, samples])
+      colors = colors[samples]
+      condition = osa[[field]][samples]
     }
     else {
       x = t(ematrix[source, ])
       y = t(ematrix[target, ])
+      condition = osa[[field]]
     }
 
-    # Set a default point color of black.
-    colors = rep('#000000', length(x))
-
-    # If there is a sample string then set the colors to match that.
-    if ('Samples' %in% names(net)) {
-      sample_str = net[i, 'Samples']
-      samples_vec = as.numeric(strsplit(sample_str, "")[[1]])
-      samples_vec[which(samples_vec != 1)] = 0
-      colors[which(samples_vec == 1)] = '#FF0000'
+    size = rep(0.3, length(x))
+    if (length(sample_indexes) > 0) {
+      size[sample_indexes] = 1
     }
 
-    main = paste('Cor: ', net[i, cor_col]);
-    if ('Missing_Samples' %in% names(net)) {
-      main = paste(main, '; ', 'Missing: ', net[i, 'Missing_Samples'], sep="")
+    coexpdata = data.frame(source = x, target = y, field = condition)
+    coexpplot = ggplot(coexpdata, aes(x, y, color=field)) +
+      geom_point(size=size) +
+      xlab(source) + ylab(target) + labs(colour=field)
+    if (!is.numeric(condition[0])) {
+      coexpplot = coexpplot + scale_color_brewer(palette="Set1")
     }
-    if ('Cluster_Samples' %in% names(net)) {
-      main = paste(main, '; ', 'Size: ', net[i, 'Cluster_Samples'], sep="")
-    }
-    if ('Num_Clusters' %in% names(net)) {
-      main = paste(main, '; ', 'Clusters: ', net[i, 'Num_Clusters'], sep="")
-    }
+    print(coexpplot)
 
-    plot(x, y, col=colors, main=main, xlab=source, ylab=target)
-    val = readline(prompt="Press enter to continue to next plot. Press 'q' and enter to quit.")
-
+    # Use the key press to navigate through the images.
+    val = readline(prompt=paste("Edge: ", i, '. ', j, " of ", length(edge_indexes), ". Type control keys the [enter]. Keys: n > forward, b > backwards, q > quit.", sep=""))
+    if (val == 'n') {
+      if (j < length(edge_indexes)) {
+        j = j + 1;
+      }
+    }
+    if (val == 'b') {
+      if (j > 1) {
+        j = j - 1
+      }
+    }
     if(val == 'q') {
-      return()
+      done = TRUE
     }
   }
 }

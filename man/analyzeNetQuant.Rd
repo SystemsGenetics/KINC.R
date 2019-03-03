@@ -4,7 +4,8 @@
 \alias{analyzeNetQuant}
 \title{Performs significance association for every edge in the network.}
 \usage{
-analyzeNetQuant(net, osa, field, samples = c(), progressBar = TRUE)
+analyzeNetQuant(net, osa, field, correction = "hochberg",
+  samples = c(), progressBar = TRUE)
 }
 \arguments{
 \item{net}{A network data frame containing the KINC-produced network.  The loadNetwork
@@ -17,6 +18,10 @@ function imports a dataframe in the correct format for this function.}
 \item{samples}{Limit the annalysis to only the samples indexes provided.}
 
 \item{progressBar}{Set to FALSE to repress progress bar}
+
+\item{correction.}{The method to apply for multiple testing correction. Valid values are identical
+to those available to the p.adjust function.  The default is to
+apply 'hochberg' correction.}
 }
 \description{
 Performs significance association for every edge in the network.

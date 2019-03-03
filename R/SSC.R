@@ -117,8 +117,6 @@ getSampleMatrix = function(net) {
 #' @param alternative
 #'   indicates the alternative hypothesis and must be one of "two.sided",
 #'   "greater" or "less". You can specify just the initial letter.
-#' @param verbose
-#'   Set to TRUE to print verbose execution details.
 sampleClusterFTest = function(category, field, osa, net, ematrix, cluster_samples, alternative = 'greater') {
 
   #  Contingency matrix for each category in a cluster:
@@ -147,9 +145,6 @@ sampleClusterFTest = function(category, field, osa, net, ematrix, cluster_sample
     )
   )
   res = fisher.test(contmatrix, alternative = alternative)
-  if (verbose) {
-    print(res)
-  }
   p.value = res$p.value
   return(p.value)
 }
@@ -183,8 +178,6 @@ sampleClusterFTest = function(category, field, osa, net, ematrix, cluster_sample
 #' @param alternative
 #'   indicates the alternative hypothesis and must be one of "two.sided",
 #'   "greater" or "less". You can specify just the initial letter. The default is 'less'
-#' @param verbose
-#'   Set to TRUE to print verbose execution details.
 sampleClusterBTest <- function(category, field, osa, net, ematrix, cluster_samples, alternative = 'greater') {
   osa_cat_indexes = which(osa$Sample %in% names(ematrix)[cluster_samples])
   osa_out_indexes = which(!osa$Sample %in% names(ematrix)[cluster_samples])
@@ -291,13 +284,11 @@ sampleClusterMTest = function(category, field, osa, net, ematrix, cluster_sample
 #'   apply 'hochberg' correction.
 #' @param samples
 #'   Limit the analysis to only the samples indexes provided.
-#' @param verbose
-#'   Set to TRUE to print execution details.
 #' @export
 #'
 #' @examples
 #'
-analyzeEdgeCat = function(i, osa, net, ematrix, field, test = 'binomial', samples=c(), verbose = FALSE) {
+analyzeEdgeCat = function(i, osa, net, ematrix, field, test = 'binomial', samples=c()) {
 
   sample_types = as.character(osa[[field]])
   num_samples = length(sample_types)
@@ -348,15 +339,14 @@ analyzeEdgeCat = function(i, osa, net, ematrix, field, test = 'binomial', sample
 #'   apply 'hochberg' correction.
 #' @param samples
 #'   Limit the analysis to only the samples indexes provided.
-#' @param verbose
-#'   Set to TRUE to print execution details.
 #' @param progressBar
 #'   Set to FALSE to repress progress bar
 #'
 #' @export
 #'
 analyzeNetCat = function(net, osa, ematrix, field, test = 'binomial',
-                         correction = 'hochberg', samples = c(), progressBar = TRUE ) {
+                         correction = 'hochberg', samples = c(),
+                         progressBar = TRUE ) {
 
   sample_types = as.character(osa[[field]])
   categories = unique(sample_types)
@@ -368,9 +358,19 @@ analyzeNetCat = function(net, osa, ematrix, field, test = 'binomial',
     net2[subname] = NA
   }
 
-  if (progressBar){pb <- txtProgressBar(min = 0, max = nrow(net), style = 3)}
+  # Intialize the progress bar
+  if (progressBar){
+    pb <- txtProgressBar(min = 0, max = nrow(net), style = 3)
+  }
+
+  # Iterate through the rows of the network
   for (i in 1:nrow(net)) {
-    if (progressBar){setTxtProgressBar(pb, i)}
+    if (progressBar){
+      setTxtProgressBar(pb, i)
+    }
+
+    # Calculate the probability that this edge is a result of any specific
+    # known experimental condition (i.e. category) for the given field.
     p.vals = analyzeEdgeCat(i, osa, net, ematrix, field, test = test, samples = samples)
     for (category in names(p.vals)) {
       subname = paste(field, category, sep='_')
@@ -456,6 +456,10 @@ analyzeEdgeQuant = function(i, osa, net, field, samples = c()) {
 #'   The ordered sample annotation data frame.
 #' @param field
 #'   The field in the osa variable on which enrichment will be performed.
+#' @param correction.
+#'   The method to apply for multiple testing correction. Valid values are identical
+#'   to those available to the p.adjust function.  The default is to
+#'   apply 'hochberg' correction.
 #' @param samples
 #'   Limit the annalysis to only the samples indexes provided.
 #' @param progressBar
@@ -463,7 +467,8 @@ analyzeEdgeQuant = function(i, osa, net, field, samples = c()) {
 #'
 #' @export
 #'
-analyzeNetQuant = function(net, osa, field, samples = c(), progressBar = TRUE) {
+analyzeNetQuant = function(net, osa, field, correction = 'hochberg',
+                           samples = c(), progressBar = TRUE) {
 
   # Add in new columns for each category.
   net2 = net
@@ -478,6 +483,10 @@ analyzeNetQuant = function(net, osa, field, samples = c(), progressBar = TRUE) {
     net2[i, paste(field, '_roccm', sep='')] = result[['roccm']]
   }
   if (progressBar){close(pb)}
+
+  # Perform multiple testing correction on the p-values
+  net2[field] = p.adjust(as.numeric(unlist(net2[field])), method=correction)
+
   return(net2);
 }
 

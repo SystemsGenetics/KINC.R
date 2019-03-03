@@ -5,7 +5,7 @@
 \title{Performs significant testing of a single edge in the network for a set of annotation categories.}
 \usage{
 analyzeEdgeCat(i, osa, net, ematrix, field, test = "binomial",
-  correction = "hochberg", samples = c(), verbose = FALSE)
+  samples = c())
 }
 \arguments{
 \item{i}{The index of the edge in the network}
@@ -25,8 +25,6 @@ function imports a dataframe in the correct format for this function.}
 test or 'binomial' for a uniqueness test.}
 
 \item{samples}{Limit the analysis to only the samples indexes provided.}
-
-\item{verbose}{Set to TRUE to print execution details.}
 
 \item{correction.}{The method to apply for multiple testing correction. Valid values are identical
 to those available to the p.adjust function.  The default is to
