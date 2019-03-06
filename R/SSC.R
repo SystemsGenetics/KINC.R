@@ -87,10 +87,10 @@ getSampleMatrix = function(net) {
 
 #' Performs a fisher's exact test on a set of samples.
 #'
-#' An annotation field and a speicfic category are provided. This
+#' An annotation field and a specific category are provided. This
 #' test reports if the category is enriched within the cluster.
 #' It does not indiciate if the category is singificantly more
-#' promenint in the cluster. For that, try the sampleCluterBTest
+#' prominent in the cluster. For that, try the sampleClusterBTest
 #' function.
 #'
 #' @param category
@@ -177,7 +177,7 @@ sampleClusterFTest = function(category, field, osa, net, ematrix, cluster_sample
 #'   apply 'hochberg' correction.
 #' @param alternative
 #'   indicates the alternative hypothesis and must be one of "two.sided",
-#'   "greater" or "less". You can specify just the initial letter. The default is 'less'
+#'   "greater" or "less". You can specify just the initial letter. The default is 'greater'
 sampleClusterBTest <- function(category, field, osa, net, ematrix, cluster_samples, alternative = 'greater') {
   osa_cat_indexes = which(osa$Sample %in% names(ematrix)[cluster_samples])
   osa_out_indexes = which(!osa$Sample %in% names(ematrix)[cluster_samples])
@@ -192,20 +192,40 @@ sampleClusterBTest <- function(category, field, osa, net, ematrix, cluster_sampl
   return(p.value)
 }
 
-#  Contingency matrix for each category in a cluster:
-#
-#                   Is Cat  Not Cat    Totals
-#                  ------------------
-#  In Cluster      |  n11   |   n12   | n1p
-#  Not in Cluster  |  n21   |   n22   | n2p
-#                  ------------------
-#  Totals             np1       np2     npp
-#
 
-##########################################################################
-#' Performs logistic regression for a set of Cluster samples
-#' This uses the
+#' Performs Logistic Regression on a set of network edge sample cluster.
+#'
+#' An annotation field and a specific category are provided. This
+#' test reports if the category is significantly related to this cluster.
+#'
+#' @param category
+#'   The annotation category to be used for testing. It must be a valid
+#'   category in the field if the osa identified by the field argument.
+#' @param field
+#'   The field in the osa variable on which enrichment will be performed.
+#' @param osa
+#'   The sample annotation matrix. One column must contain the header 'Sample'
+#'   and the remaining colums correspond to an annotation type.  The rows
+#'   of the anntation columns should contain the annotations.
+#' @param net
+#'   A network data frame containing the KINC-produced network.  The loadNetwork
+#'   function imports a dataframe in the correct format for this function.
+#' @param ematrix
+#'   The expression matrix data frame.
+#' @param cluster_samples
+#'   The indexe of samples wihin the cluster. These correspond to indexes
+#'   in the column names of the expression matrix.
 sampleClusterlogit <- function(category, field, osa, net, ematrix, cluster_samples){
+
+  #  Contingency matrix for each category in a cluster:
+  #
+  #                   Is Cat  Not Cat    Totals
+  #                  ------------------
+  #  In Cluster      |  n11   |   n12   | n1p
+  #  Not in Cluster  |  n21   |   n22   | n2p
+  #                  ------------------
+  #  Totals             np1       np2     npp
+
   num_categories = unique(osa[[field]])
   osa_cat_indexes = which(osa$Sample %in% names(ematrix)[cluster_samples])
   osa_out_indexes = which(!osa$Sample %in% names(ematrix)[cluster_samples])
@@ -231,8 +251,26 @@ sampleClusterlogit <- function(category, field, osa, net, ematrix, cluster_sampl
   return(p.val)
 
 }
-#######################################################################################################
-## Multinomial Test
+
+#' Performs Multinomial test on a set of network edge sample cluster.
+#'
+#' @param category
+#'   The annotation category to be used for testing. It must be a valid
+#'   category in the field if the osa identified by the field argument.
+#' @param field
+#'   The field in the osa variable on which enrichment will be performed.
+#' @param osa
+#'   The sample annotation matrix. One column must contain the header 'Sample'
+#'   and the remaining colums correspond to an annotation type.  The rows
+#'   of the anntation columns should contain the annotations.
+#' @param net
+#'   A network data frame containing the KINC-produced network.  The loadNetwork
+#'   function imports a dataframe in the correct format for this function.
+#' @param ematrix
+#'   The expression matrix data frame.
+#' @param cluster_samples
+#'   The indexe of samples wihin the cluster. These correspond to indexes
+#'   in the column names of the expression matrix.
 sampleClusterMTest = function(category, field, osa, net, ematrix, cluster_samples) {
 
   osa_cat_indexes = which(osa$Sample %in% names(ematrix)[cluster_samples])
@@ -387,7 +425,7 @@ analyzeNetCat = function(net, osa, ematrix, field, test = 'binomial',
 
   return(net2);
 }
-#' Performs linear regression of a quantitative traits against a a single edge in the network.
+#' Performs linear regression of a quantitative traits against a single edge in the network.
 #'
 #' @param i
 #'   The index of the edge in the network
