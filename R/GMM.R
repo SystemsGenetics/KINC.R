@@ -1,0 +1,113 @@
+#' Performs pair-wise Gaussian Mixture Models (GMM) on a pair of genes
+#'
+#' @param source
+#'   The name of the source gene.
+#' @param target
+#'   The name of the target gene.
+#' @param ematrix
+#'   The expression matrix data frame.
+#' @param th
+#'   The similarity value threshold. Any correlation value greater than or equal to the
+#'   absolute value of this number is kept as an edge.
+#' @param method
+#'   The correlation method to perform (see the cor function for valid options)
+#' @return
+#'   Returns a data frame of edges in the same format as the network returned by
+#'   the loadNetwork function.
+#' @export
+#'
+getPairGMMEdges = function(source, target, ematrix, th=0.5, method="spearman") {
+
+  # Get the source and target genes from the expression matrix
+  x =  t(ematrix[source,])
+  y =  t(ematrix[target,])
+
+  # We'll use this data frame to calculate the sample strings.
+  S = data.frame(x=x, y=y, stype=0, index=1:length(x), cluster=NA)
+  colnames(S) = c('x', 'y', 'stype', 'index', 'cluster')
+
+  # Remove missing values
+  x2 = x[!(is.na(x) | is.na(y))]
+  y2 = y[!(is.na(x) | is.na(y))]
+
+  # Missing values get a number 9.
+  S[which(is.na(x) | is.na(y)), 'stype'] = 9
+
+  # Remove outliers
+  bx = boxplot(x2, plot = FALSE)
+  by = boxplot(y2, plot = FALSE)
+  x_outliers = which(x2 %in% bx$out)
+  y_outliers = which(y2 %in% by$out)
+  outliers = c(x_outliers, y_outliers)
+  if (length(outliers) > 0) {
+    x2 = as.matrix(x[-outliers])
+    y2 = as.matrix(y[-outliers])
+  }
+
+  # Pair-wise outliers get a number 7.
+  S[which(S$x %in% bx$out), 'stype'] = 7
+  S[which(S$y %in% by$out), 'stype'] = 7
+
+  # Perform the GMM clustering.
+  X = S[which(S$stype == 0),]
+  xem = mixmodCluster(X[c("x", "y")], nbCluster=1:5, criterion="ICL")
+
+  # Get the best set of clusters.
+  b=xem['bestResult']
+  plotCluster(b, X, xlab=gene1, ylab=gene2, cex.lab=1.5, cex.axis=1.5)
+
+  # Keep track of the cluster that each sample belongs to.
+  X$cluster = b@partition
+  S[X$index, 'cluster'] = X$cluster
+
+  # Build the edges data frame, we'll return this when the function completes.
+  edges = data.frame(Source = character(), Target = character(), sc = numeric(),
+                     Interaction = character(), Cluster = numeric(),
+                     Num_Clusters = numeric(), Cluster_Samples = numeric(), Missing_Samples = numeric(),
+                     Cluster_Outliers = numeric(), Pair_Outliers = numeric(), Too_Low = numeric(),
+                     Samples = character(), stringsAsFactors = FALSE)
+
+  # Itearate through the clusters, remove outliers, perform correlation
+  # analyis and if the correlation value is > then the threshodl, add the
+  # cluster as an edge.
+  for (ci in 1:b@nbCluster) {
+
+    # Get the cluster points.
+    cx = X$x[which(X$cluster == ci)]
+    cy = X$y[which(X$cluster == ci)]
+
+    # First, remove outliers from the cluster
+    cbx = boxplot(cx, plot = FALSE)
+    cby = boxplot(cy, plot = FALSE)
+    cx_outliers = which(cx %in% cbx$out)
+    cy_outliers = which(cy %in% cby$out)
+    coutliers = c(cx_outliers, cy_outliers)
+    if (length(coutliers) > 0) {
+      cx = as.matrix(cx[-coutliers])
+      cy = as.matrix(cy[-coutliers])
+    }
+
+    # Perform correlation.
+    r = cor(cx, cy, method=method)
+
+    # If the correlation value is > the threshold add the edge.
+    if (abs(r) >= th) {
+
+      # Create the sample string
+      sample_str = S$stype
+      sample_str[which(S$cluster == ci)] = 1
+      sample_str[coutliers] = 8
+      sample_str = paste(sample_str, sep='', collapse='')
+
+      # Create a new edge dataframe and merge it into our edges data frame.
+      edge = data.frame(Source = gene1, Target = gene2, sc = r, Interaction = 'co', Cluster = ci,
+                       Num_Clusters = b@nbCluster, Cluster_Samples = length(cx),
+                       Missing_Samples = length(which(S$stype == 9)),
+                       Cluster_Outliers = length(which(S$stype == 8)),
+                       Pair_Outliers = length(which(S$stype == 7)),
+                       Too_Low = 0, Samples = sample_str, stringsAsFactors=FALSE)
+      edges = rbind(edges, edge)
+    }
+  }
+  return (edges)
+}

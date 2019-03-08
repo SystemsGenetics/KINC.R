@@ -26,7 +26,7 @@ function imports a dataframe in the correct format for this function.}
 in the column names of the expression matrix.}
 
 \item{alternative}{indicates the alternative hypothesis and must be one of "two.sided",
-"greater" or "less". You can specify just the initial letter. The default is 'less'}
+"greater" or "less". You can specify just the initial letter. The default is 'greater'}
 
 \item{correction.}{The method to apply for multiple testing correction. Valid values are identical
 to those available to the p.adjust function.  The default is to

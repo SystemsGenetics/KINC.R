@@ -2,12 +2,29 @@
 % Please edit documentation in R/SSC.R
 \name{sampleClusterlogit}
 \alias{sampleClusterlogit}
-\title{Performs logistic regression for a set of Cluster samples
-This uses the}
+\title{Performs Logistic Regression on a set of network edge sample cluster.}
 \usage{
 sampleClusterlogit(category, field, osa, net, ematrix, cluster_samples)
 }
+\arguments{
+\item{category}{The annotation category to be used for testing. It must be a valid
+category in the field if the osa identified by the field argument.}
+
+\item{field}{The field in the osa variable on which enrichment will be performed.}
+
+\item{osa}{The sample annotation matrix. One column must contain the header 'Sample'
+and the remaining colums correspond to an annotation type.  The rows
+of the anntation columns should contain the annotations.}
+
+\item{net}{A network data frame containing the KINC-produced network.  The loadNetwork
+function imports a dataframe in the correct format for this function.}
+
+\item{ematrix}{The expression matrix data frame.}
+
+\item{cluster_samples}{The indexe of samples wihin the cluster. These correspond to indexes
+in the column names of the expression matrix.}
+}
 \description{
-Performs logistic regression for a set of Cluster samples
-This uses the
+An annotation field and a specific category are provided. This
+test reports if the category is significantly related to this cluster.
 }

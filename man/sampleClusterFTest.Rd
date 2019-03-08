@@ -33,9 +33,9 @@ to those available to the p.adjust function.  The default is to
 apply 'hochberg' correction.}
 }
 \description{
-An annotation field and a speicfic category are provided. This
+An annotation field and a specific category are provided. This
 test reports if the category is enriched within the cluster.
 It does not indiciate if the category is singificantly more
-promenint in the cluster. For that, try the sampleCluterBTest
+prominent in the cluster. For that, try the sampleClusterBTest
 function.
 }

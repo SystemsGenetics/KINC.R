@@ -330,15 +330,20 @@ plot2DEdgeList = function(edge_indexes, osa, net, ematrix,
       size[sample_indexes] = 1
     }
 
-    coexpdata = data.frame(source = x, target = y, field = condition)
-    coexpplot = ggplot(coexpdata, aes(x, y, color=field)) +
-      geom_point(size=size) +
+    coexpdata = data.frame(source = x, target = y, category = condition, size = size)
+    colnames(coexpdata) = c('x', 'y', 'category', 'size')
+    coexpdata = coexpdata[complete.cases(coexpdata),]
+    coexpplot = ggplot(coexpdata, aes(x, y, color=category)) +
+      geom_point(size=coexpdata$size) +
       xlab(source) + ylab(target) + labs(colour=field)
     if (!is.numeric(condition[0])) {
       coexpplot = coexpplot + scale_color_brewer(palette="Set1")
     }
     print(coexpplot)
 
+    if (length(edge_indexes) == 1) {
+      return()
+    }
     # Use the key press to navigate through the images.
     val = readline(prompt=paste("Edge: ", i, '. ', j, " of ", length(edge_indexes), ". Type control keys the [enter]. Keys: n > forward, b > backwards, q > quit.", sep=""))
     if (val == 'n') {
