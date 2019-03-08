@@ -19,7 +19,7 @@ getEdgeSamples <- function(i, net) {
   return (sample_indexes)
 }
 
-#' Perfoms heirarchical clustering of edges in a network based on their sample compositions.
+#' Performs hierarchical clustering of edges in a network based on their sample compositions.
 #'
 #' This function uses the dist function to calucate a distance and the
 #' hclust function to generate the dendrogram.
@@ -148,49 +148,7 @@ sampleClusterFTest = function(category, field, osa, net, ematrix, cluster_sample
   p.value = res$p.value
   return(p.value)
 }
-#' Performs a Binomial test on a set of network edge sample cluster.
-#'
-#' An annotation field and a speicfic category are provided. This
-#' test reports if the category is singificantly more
-#' promenint in the cluster than other categories.
-#'
-#' @param category
-#'   The annotation category to be used for testing. It must be a valid
-#'   category in the field if the osa identified by the field argument.
-#' @param field
-#'   The field in the osa variable on which enrichment will be performed.
-#' @param osa
-#'   The sample annotation matrix. One column must contain the header 'Sample'
-#'   and the remaining colums correspond to an annotation type.  The rows
-#'   of the anntation columns should contain the annotations.
-#' @param net
-#'   A network data frame containing the KINC-produced network.  The loadNetwork
-#'   function imports a dataframe in the correct format for this function.
-#' @param ematrix
-#'   The expression matrix data frame.
-#' @param cluster_samples
-#'   The indexe of samples wihin the cluster. These correspond to indexes
-#'   in the column names of the expression matrix.
-#' @param correction.
-#'   The method to apply for multiple testing correction. Valid values are identical
-#'   to those available to the p.adjust function.  The default is to
-#'   apply 'hochberg' correction.
-#' @param alternative
-#'   indicates the alternative hypothesis and must be one of "two.sided",
-#'   "greater" or "less". You can specify just the initial letter. The default is 'greater'
-sampleClusterBTest <- function(category, field, osa, net, ematrix, cluster_samples, alternative = 'greater') {
-  osa_cat_indexes = which(osa$Sample %in% names(ematrix)[cluster_samples])
-  osa_out_indexes = which(!osa$Sample %in% names(ematrix)[cluster_samples])
 
-  successes = length(which(osa[[field]][osa_cat_indexes] == category))
-  failures = length(which(osa[[field]][osa_cat_indexes] != category))
-  num_categories = length(unique(osa[[field]]))
-  num_of_category = length(which(osa[[field]] == category))
-  prob_of_success = num_of_category / length(osa[[field]])
-  res = binom.test(c(successes, failures), p=prob_of_success, alternative=alternative, conf.level = 0.99)
-  p.value = res$p.value
-  return(p.value)
-}
 
 
 #' Performs Logistic Regression on a set of network edge sample cluster.
@@ -314,19 +272,15 @@ sampleClusterMTest = function(category, field, osa, net, ematrix, cluster_sample
 #' @param field
 #'   The field in the osa variable on which enrichment will be performed.
 #' @param test
-#'   The statistical test to prform.  This can either be 'fishers' for an enrichment
-#'   test or 'binomial' for a uniqueness test.
-#' @param correction.
-#'   The method to apply for multiple testing correction. Valid values are identical
-#'   to those available to the p.adjust function.  The default is to
-#'   apply 'hochberg' correction.
+#'   The statistical test to perform.  This is 'fishers' for an enrichment
+#'   test.
 #' @param samples
 #'   Limit the analysis to only the samples indexes provided.
 #' @export
 #'
 #' @examples
 #'
-analyzeEdgeCat = function(i, osa, net, ematrix, field, test = 'binomial', samples=c()) {
+analyzeEdgeCat = function(i, osa, net, ematrix, field, test = 'fishers', samples=c()) {
 
   sample_types = as.character(osa[[field]])
   num_samples = length(sample_types)
@@ -344,11 +298,7 @@ analyzeEdgeCat = function(i, osa, net, ematrix, field, test = 'binomial', sample
     names(pvals) = categories
     return(pvals);
   }
-  if (test == 'binomial') {
-    pvals = sapply(categories, sampleClusterBTest, field, osa, net, ematrix, edge_samples, alternative = 'greater')
-    names(pvals) = categories
-    return(pvals);
-  }
+
   if(test == 'logit'){
     pvals = sapply(categories,sampleClusterlogit, field, osa, net, ematrix, edge_samples)
     names(pvals) = categories
@@ -369,8 +319,8 @@ analyzeEdgeCat = function(i, osa, net, ematrix, field, test = 'binomial', sample
 #' @param field
 #'   The field in the osa variable on which enrichment will be performed.
 #' @param test
-#'   The statistical test to prform.  This can either be 'fishers' for an enrichment
-#'   test or 'binomial' for a uniqueness test.
+#'   The statistical test to perform.  This is 'fishers' for an enrichment
+#'   test.
 #' @param correction.
 #'   The method to apply for multiple testing correction. Valid values are identical
 #'   to those available to the p.adjust function.  The default is to
@@ -382,7 +332,7 @@ analyzeEdgeCat = function(i, osa, net, ematrix, field, test = 'binomial', sample
 #'
 #' @export
 #'
-analyzeNetCat = function(net, osa, ematrix, field, test = 'binomial',
+analyzeNetCat = function(net, osa, ematrix, field, test = 'fishers',
                          correction = 'hochberg', samples = c(),
                          progressBar = TRUE ) {
 
