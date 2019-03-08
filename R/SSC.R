@@ -423,10 +423,13 @@ analyzeEdgeQuant = function(i, osa, net, field, samples = c()) {
   # Use linear regression to obtain a p-value for the association.
   model = lm(y + x ~ z, data=data.frame(x=x, y=y, z=z))
   s = summary(model)
-  pval = s$coefficients[2,4]
-
-  # Get the rate of change of the mean of y + x
-  roccm = s$coefficients[2,1]
+  pval = NA
+  roccm = NA
+  if (dim(s$coefficients)[1] > 1) {
+    pval = s$coefficients[2,4]
+    # Get the rate of change of the mean of y + x
+    roccm = s$coefficients[2,1]
+  }
 
   return(list(
     p = pval,

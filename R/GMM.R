@@ -6,17 +6,21 @@
 #'   The name of the target gene.
 #' @param ematrix
 #'   The expression matrix data frame.
-#' @param th
-#'   The similarity value threshold. Any correlation value greater than or equal to the
-#'   absolute value of this number is kept as an edge.
 #' @param method
 #'   The correlation method to perform (see the cor function for valid options)
+#' @param th
+#'   The similarity value threshold. Any correlation value greater than or equal to the
+#'   absolute value of this number is kept as an edge. Derfault = 0.5.
+#' @param minc
+#'   The minimum number of samples that must be present to identify a cluster. Default = 30.
+#' @param plot
+#'   Boolean indicating if the Rmixmod clusters scatterplot should be drawn. Default = FALSE
 #' @return
 #'   Returns a data frame of edges in the same format as the network returned by
 #'   the loadNetwork function.
 #' @export
 #'
-getPairGMMEdges = function(source, target, ematrix, th=0.5, method="spearman") {
+getPairGMMEdges = function(source, target, ematrix, minc = 30, method="spearman", th=0.5, plot=FALSE) {
 
   # Get the source and target genes from the expression matrix
   x =  t(ematrix[source,])
@@ -54,7 +58,9 @@ getPairGMMEdges = function(source, target, ematrix, th=0.5, method="spearman") {
 
   # Get the best set of clusters.
   b=xem['bestResult']
-  plotCluster(b, X, xlab=gene1, ylab=gene2, cex.lab=1.5, cex.axis=1.5)
+  if (plot) {
+    plotCluster(b, X, xlab=gene1, ylab=gene2, cex.lab=1.5, cex.axis=1.5)
+  }
 
   # Keep track of the cluster that each sample belongs to.
   X$cluster = b@partition
@@ -87,6 +93,11 @@ getPairGMMEdges = function(source, target, ematrix, th=0.5, method="spearman") {
       cy = as.matrix(cy[-coutliers])
     }
 
+    # Skip clusters that are too small.
+    if (length(cx) < minc) {
+      next
+    }
+
     # Perform correlation.
     r = cor(cx, cy, method=method)
 
@@ -100,7 +111,7 @@ getPairGMMEdges = function(source, target, ematrix, th=0.5, method="spearman") {
       sample_str = paste(sample_str, sep='', collapse='')
 
       # Create a new edge dataframe and merge it into our edges data frame.
-      edge = data.frame(Source = gene1, Target = gene2, sc = r, Interaction = 'co', Cluster = ci,
+      edge = data.frame(Source = source, Target = target, sc = r, Interaction = 'co', Cluster = ci,
                        Num_Clusters = b@nbCluster, Cluster_Samples = length(cx),
                        Missing_Samples = length(which(S$stype == 9)),
                        Cluster_Outliers = length(which(S$stype == 8)),
