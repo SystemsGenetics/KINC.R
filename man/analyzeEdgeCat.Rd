@@ -4,7 +4,7 @@
 \alias{analyzeEdgeCat}
 \title{Performs significant testing of a single edge in the network for a set of annotation categories.}
 \usage{
-analyzeEdgeCat(i, osa, net, ematrix, field, test = "binomial",
+analyzeEdgeCat(i, osa, net, ematrix, field, test = "fishers",
   samples = c())
 }
 \arguments{
@@ -21,14 +21,10 @@ function imports a dataframe in the correct format for this function.}
 
 \item{field}{The field in the osa variable on which enrichment will be performed.}
 
-\item{test}{The statistical test to prform.  This can either be 'fishers' for an enrichment
-test or 'binomial' for a uniqueness test.}
+\item{test}{The statistical test to perform.  This is 'fishers' for an enrichment
+test.}
 
 \item{samples}{Limit the analysis to only the samples indexes provided.}
-
-\item{correction.}{The method to apply for multiple testing correction. Valid values are identical
-to those available to the p.adjust function.  The default is to
-apply 'hochberg' correction.}
 }
 \description{
 Performs significant testing of a single edge in the network for a set of annotation categories.

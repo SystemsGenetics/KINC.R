@@ -4,7 +4,8 @@
 \alias{getPairGMMEdges}
 \title{Performs pair-wise Gaussian Mixture Models (GMM) on a pair of genes}
 \usage{
-getPairGMMEdges(source, target, ematrix, th = 0.5, method = "spearman")
+getPairGMMEdges(source, target, ematrix, minc = 30,
+  method = "spearman", th = 0.5, plot = FALSE)
 }
 \arguments{
 \item{source}{The name of the source gene.}
@@ -13,10 +14,14 @@ getPairGMMEdges(source, target, ematrix, th = 0.5, method = "spearman")
 
 \item{ematrix}{The expression matrix data frame.}
 
-\item{th}{The similarity value threshold. Any correlation value greater than or equal to the
-absolute value of this number is kept as an edge.}
+\item{minc}{The minimum number of samples that must be present to identify a cluster. Default = 30.}
 
 \item{method}{The correlation method to perform (see the cor function for valid options)}
+
+\item{th}{The similarity value threshold. Any correlation value greater than or equal to the
+absolute value of this number is kept as an edge. Derfault = 0.5.}
+
+\item{plot}{Boolean indicating if the Rmixmod clusters scatterplot should be drawn. Default = FALSE}
 }
 \value{
 Returns a data frame of edges in the same format as the network returned by

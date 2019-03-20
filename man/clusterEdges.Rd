@@ -2,7 +2,7 @@
 % Please edit documentation in R/SSC.R
 \name{clusterEdges}
 \alias{clusterEdges}
-\title{Perfoms heirarchical clustering of edges in a network based on their sample compositions.}
+\title{Performs hierarchical clustering of edges in a network based on their sample compositions.}
 \usage{
 clusterEdges(net, distMethod = "manhattan", hclustMethod = "ward.D2")
 }

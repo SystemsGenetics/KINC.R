@@ -365,7 +365,9 @@ analyzeNetCat = function(net, osa, ematrix, field, test = 'fishers',
       net2[i, subname] = p.vals[category]
     }
   }
-  if (progressBar){close(pb)}
+  if (progressBar){
+    close(pb)
+  }
 
   # Perform multiple testing correction on the p-values
   for (category in categories) {

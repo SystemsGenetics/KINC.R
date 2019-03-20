@@ -4,7 +4,7 @@
 \alias{analyzeNetCat}
 \title{Performs significant testing of each edge in the network for a set of annotation categories.}
 \usage{
-analyzeNetCat(net, osa, ematrix, field, test = "binomial",
+analyzeNetCat(net, osa, ematrix, field, test = "fishers",
   correction = "hochberg", samples = c(), progressBar = TRUE)
 }
 \arguments{
@@ -17,8 +17,8 @@ function imports a dataframe in the correct format for this function.}
 
 \item{field}{The field in the osa variable on which enrichment will be performed.}
 
-\item{test}{The statistical test to prform.  This can either be 'fishers' for an enrichment
-test or 'binomial' for a uniqueness test.}
+\item{test}{The statistical test to perform.  This is 'fishers' for an enrichment
+test.}
 
 \item{samples}{Limit the analysis to only the samples indexes provided.}
 

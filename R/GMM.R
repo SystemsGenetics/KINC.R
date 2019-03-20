@@ -122,3 +122,57 @@ getPairGMMEdges = function(source, target, ematrix, minc = 30, method="spearman"
   }
   return (edges)
 }
+
+
+countEmatrixModes = function(ematrix, minc = 30, plot=FALSE, progressBar = TRUE) {
+
+  num_genes = dim(ematrix)[1]
+
+  # Intalize the progress bar.
+  if (progressBar){
+    pb <- txtProgressBar(min = 0, max = num_genes, style = 3)
+  }
+
+  # Initalize the counts array that we will return.
+  counts <- vector(mode="numeric", length=num_genes)
+
+  # Perform GMM on each row of the GMM and we'll calculate the
+  # modes of expression for each gene/transcript.
+  for (i in 1:num_genes)  {
+
+    # Set the progress bar
+    if (progressBar){
+      setTxtProgressBar(pb, i)
+    }
+
+    # Get the gene expression and initalize its counts.
+    gene = t(ematrix[i,])
+    gene_name = colnames(gene)[1]
+
+    # Remove missing values
+    gene = data.frame(gene_name = gene[complete.cases(gene)])
+
+    # Only perform GMMs for rows with enough samples.
+    if (dim(gene)[1] < minc) {
+      next
+    }
+
+    # Perform GMMs on this edge
+    xem = mixmodCluster(gene, nbCluster=1:5, criterion="ICL")
+
+    # Get the best set of clusters.
+    b=xem['bestResult']
+    if (plot) {
+      hist(xem)
+    }
+
+    counts[i] = b@nbCluster
+  }
+
+  # Close down the progress bar.
+  if (progressBar){
+    close(pb)
+  }
+
+  return(counts)
+}
