@@ -149,113 +149,6 @@ sampleClusterFTest = function(category, field, osa, net, ematrix, cluster_sample
   return(p.value)
 }
 
-
-
-#' Performs Logistic Regression on a set of network edge sample cluster.
-#'
-#' An annotation field and a specific category are provided. This
-#' test reports if the category is significantly related to this cluster.
-#'
-#' @param category
-#'   The annotation category to be used for testing. It must be a valid
-#'   category in the field if the osa identified by the field argument.
-#' @param field
-#'   The field in the osa variable on which enrichment will be performed.
-#' @param osa
-#'   The sample annotation matrix. One column must contain the header 'Sample'
-#'   and the remaining colums correspond to an annotation type.  The rows
-#'   of the anntation columns should contain the annotations.
-#' @param net
-#'   A network data frame containing the KINC-produced network.  The loadNetwork
-#'   function imports a dataframe in the correct format for this function.
-#' @param ematrix
-#'   The expression matrix data frame.
-#' @param cluster_samples
-#'   The indexe of samples wihin the cluster. These correspond to indexes
-#'   in the column names of the expression matrix.
-sampleClusterlogit <- function(category, field, osa, net, ematrix, cluster_samples){
-
-  #  Contingency matrix for each category in a cluster:
-  #
-  #                   Is Cat  Not Cat    Totals
-  #                  ------------------
-  #  In Cluster      |  n11   |   n12   | n1p
-  #  Not in Cluster  |  n21   |   n22   | n2p
-  #                  ------------------
-  #  Totals             np1       np2     npp
-
-  num_categories = unique(osa[[field]])
-  osa_cat_indexes = which(osa$Sample %in% names(ematrix)[cluster_samples])
-  osa_out_indexes = which(!osa$Sample %in% names(ematrix)[cluster_samples])
-  n11 = length(which(osa[[field]][osa_cat_indexes] == category))
-  n12 = length(which(osa[[field]][osa_cat_indexes] != category))
-  n21 = length(which(osa[[field]][osa_out_indexes] == category))
-  n22 = length(which(osa[[field]][osa_out_indexes] != category))
-
-  contmatrix = matrix(
-    as.numeric(c(n11, n21, n12, n22)),
-    nr=2,
-    dimnames = list(
-      In_Cluster = c("Yes", "No"),
-      Is_Category = c("Yes", "No")
-    )
-  )
-
-
-  xfactor = factor(c("Yes","No"))
-  logitreg = glm(contmatrix ~ xfactor, family = binomial("logit"))
-  summ = summary(logitreg)
-  p.val = summ$coefficients[2,4]
-  return(p.val)
-
-}
-
-#' Performs Multinomial test on a set of network edge sample cluster.
-#'
-#' @param category
-#'   The annotation category to be used for testing. It must be a valid
-#'   category in the field if the osa identified by the field argument.
-#' @param field
-#'   The field in the osa variable on which enrichment will be performed.
-#' @param osa
-#'   The sample annotation matrix. One column must contain the header 'Sample'
-#'   and the remaining colums correspond to an annotation type.  The rows
-#'   of the anntation columns should contain the annotations.
-#' @param net
-#'   A network data frame containing the KINC-produced network.  The loadNetwork
-#'   function imports a dataframe in the correct format for this function.
-#' @param ematrix
-#'   The expression matrix data frame.
-#' @param cluster_samples
-#'   The indexe of samples wihin the cluster. These correspond to indexes
-#'   in the column names of the expression matrix.
-sampleClusterMTest = function(category, field, osa, net, ematrix, cluster_samples) {
-
-  osa_cat_indexes = which(osa$Sample %in% names(ematrix)[cluster_samples])
-  osa_out_indexes = which(!osa$Sample %in% names(ematrix)[cluster_samples])
-
-  categories = unique(osa[[field]])
-  num_categories = length(categories)
-
-  # Calculating the prob. of success for each category.
-  prob_of_success <- vector()
-  for (category in categories) {
-    num_of_category = length(which(osa[[field]] == category))
-    prob_of_success[category] = num_of_category / length(osa[[field]])
-  }
-
-  # Count the number of observed.
-  observed <- vector()
-  for(category in categories) {
-    observed[category] = length(which(osa[[field]][osa_cat_indexes] == category))
-  }
-
-  res = multinomial.test(observed, prob_of_success, MonteCarlo = TRUE)
-  p.value = res$p.value
-  return(p.value)
-}
-
-
 #' Performs significant testing of a single edge in the network for a set of annotation categories.
 #'
 #' @param i
@@ -295,12 +188,6 @@ analyzeEdgeCat = function(i, osa, net, ematrix, field, test = 'fishers', samples
 
   if (test == 'fishers') {
     pvals = sapply(categories, sampleClusterFTest, field, osa, net, ematrix, edge_samples, alternative = 'greater')
-    names(pvals) = categories
-    return(pvals);
-  }
-
-  if(test == 'logit'){
-    pvals = sapply(categories,sampleClusterlogit, field, osa, net, ematrix, edge_samples)
     names(pvals) = categories
     return(pvals);
   }
