@@ -20,7 +20,8 @@
 #'   the loadNetwork function.
 #' @export
 #'
-getPairGMMEdges = function(source, target, ematrix, minc = 30, method="spearman", th=0.5, plot=FALSE) {
+getPairGMMEdges = function(source, target, ematrix, minc = 30,
+  method="spearman", th=0.5, plot=FALSE) {
 
   # Get the source and target genes from the expression matrix
   x =  t(ematrix[source,])
@@ -59,7 +60,7 @@ getPairGMMEdges = function(source, target, ematrix, minc = 30, method="spearman"
   # Get the best set of clusters.
   b=xem['bestResult']
   if (plot) {
-    plotCluster(b, X, xlab=gene1, ylab=gene2, cex.lab=1.5, cex.axis=1.5)
+    plotCluster(b, X, xlab=source, ylab=target, cex.lab=1.5, cex.axis=1.5)
   }
 
   # Keep track of the cluster that each sample belongs to.

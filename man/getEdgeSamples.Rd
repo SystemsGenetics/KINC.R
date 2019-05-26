@@ -2,7 +2,7 @@
 % Please edit documentation in R/SSC.R
 \name{getEdgeSamples}
 \alias{getEdgeSamples}
-\title{Converts and edge sample string into an array of indexes.}
+\title{Converts an edge sample string into an array of indexes of samples belonging to the cluseter.}
 \usage{
 getEdgeSamples(i, net)
 }
@@ -18,5 +18,5 @@ An array of sample indexes that are part of the cluster. Because these
   correspond to the order of samples in the expression matrix.
 }
 \description{
-Converts and edge sample string into an array of indexes.
+Converts an edge sample string into an array of indexes of samples belonging to the cluseter.
 }

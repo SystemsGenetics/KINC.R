@@ -1,4 +1,4 @@
-#' Converts and edge sample string into an array of indexes.
+#' Converts an edge sample string into an array of indexes of samples belonging to the cluseter.
 #'
 #' @param i
 #'   The index of the edge in the network
@@ -19,6 +19,25 @@ getEdgeSamples <- function(i, net) {
   return (sample_indexes)
 }
 
+#' Converts and edge sample string into an array.
+#'
+#' @param i
+#'   The index of the edge in the network
+#' @param net
+#'   A network dataframe containing the KINC-produced network.  The loadNetwork
+#'   function imports a dataframe in the correct format for this function.
+#' @return
+#'   An array whose values are  1 if the sample is in the cluster,
+#'   0 if the sample is in another cluster, 9 if the sample is missing and
+#'   7 if the sample was removed as a pairwise outlier or 8 if the sample
+#'   was removed as a cluster outlier.
+#' @export
+getSampleStringArray <-function(i, net){
+  edge = net[i,]
+  sample_str = edge$Samples
+  edge_samples = as.numeric(strsplit(sample_str, "")[[1]])
+  return(edge_samples)
+}
 #' Performs hierarchical clustering of edges in a network based on their sample compositions.
 #'
 #' This function uses the dist function to calucate a distance and the
@@ -92,32 +111,32 @@ getSampleMatrix = function(net) {
 #' It does not indiciate if the category is singificantly more
 #' prominent in the cluster. For that, try the sampleClusterBTest
 #' function.
-#'
 #' @param category
 #'   The annotation category to be used for testing. It must be a valid
 #'   category in the field if the osa identified by the field argument.
 #' @param field
 #'   The field in the osa variable on which enrichment will be performed.
+#' @param i
+#'   The index of the edge in the network
+#' @param net
+#'   A network data frame containing the KINC-produced network.  The loadNetwork
+#'   function imports a dataframe in the correct format for this function.
 #' @param osa
 #'   The sample annotation matrix. One column must contain the header 'Sample'
 #'   and the remaining colums correspond to an annotation type.  The rows
 #'   of the anntation columns should contain the annotations.
-#' @param net
-#'   A network data frame containing the KINC-produced network.  The loadNetwork
-#'   function imports a dataframe in the correct format for this function.
 #' @param ematrix
 #'   The expression matrix data frame.
-#' @param cluster_samples
-#'   The indexe of samples wihin the cluster. These correspond to indexes
-#'   in the column names of the expression matrix.
-#' @param correction.
-#'   The method to apply for multiple testing correction. Valid values are identical
-#'   to those available to the p.adjust function.  The default is to
-#'   apply 'hochberg' correction.
-#' @param alternative
-#'   indicates the alternative hypothesis and must be one of "two.sided",
-#'   "greater" or "less". You can specify just the initial letter.
-sampleClusterFTest = function(category, field, osa, net, ematrix, cluster_samples, alternative = 'greater') {
+#' @param samples
+#'   Limit the analysis to only the samples indexes provided.
+performClusterFishersTest = function(category, field, i, net, osa, ematrix, verbose=FALSE) {
+
+  # Convert the sample string to a numerical vector.
+  cluster_samples = getEdgeSamples(i, net)
+
+  # Get osa elements for samples that belong to the cluster and those that don't.
+  osa_cat_indexes = which(osa$Sample %in% names(ematrix)[cluster_samples])
+  osa_out_indexes = which(!osa$Sample %in% names(ematrix)[cluster_samples])
 
   #  Contingency matrix for each category in a cluster:
   #
@@ -128,9 +147,6 @@ sampleClusterFTest = function(category, field, osa, net, ematrix, cluster_sample
   #                  ------------------
   #  Totals             np1       np2     npp
   #
-  num_categories = unique(osa[[field]])
-  osa_cat_indexes = which(osa$Sample %in% names(ematrix)[cluster_samples])
-  osa_out_indexes = which(!osa$Sample %in% names(ematrix)[cluster_samples])
   n11 = length(which(osa[[field]][osa_cat_indexes] == category))
   n12 = length(which(osa[[field]][osa_cat_indexes] != category))
   n21 = length(which(osa[[field]][osa_out_indexes] == category))
@@ -144,8 +160,79 @@ sampleClusterFTest = function(category, field, osa, net, ematrix, cluster_sample
       Is_Category = c("Yes", "No")
     )
   )
-  res = fisher.test(contmatrix, alternative = alternative)
+
+  if (verbose) {
+    print(contmatrix)
+  }
+  res = fisher.test(contmatrix, alternative = "greater")
   p.value = res$p.value
+  return(p.value)
+}
+
+#' Performs a fisher's exact test on a set of samples.
+#'
+#' An annotation field and a specific category are provided. This
+#' test reports if the category is enriched within the cluster.
+#' It does not indiciate if the category is singificantly more
+#' prominent in the cluster. For that, try the sampleClusterBTest
+#' function.
+#' @param category
+#'   The annotation category to be used for testing. It must be a valid
+#'   category in the field if the osa identified by the field argument.
+#' @param field
+#'   The field in the osa variable on which enrichment will be performed.
+#' @param i
+#'   The index of the edge in the network
+#' @param net
+#'   A network data frame containing the KINC-produced network.  The loadNetwork
+#'   function imports a dataframe in the correct format for this function.
+#' @param osa
+#'   The sample annotation matrix. One column must contain the header 'Sample'
+#'   and the remaining colums correspond to an annotation type.  The rows
+#'   of the anntation columns should contain the annotations.
+#' @param ematrix
+#'   The expression matrix data frame.
+#' @param p_succ
+#'   The probabilty of success for the binomial test.  Or, in other words,
+#'   the percentage of expected samples for a category in the cluster.
+performClusterBinomialTest = function(category, field, i, net, osa, ematrix, p_succ = 0.85, verbose=FALSE) {
+
+  # Convert the sample string to a numerical vector.
+  cluster_samples = getEdgeSamples(i, net)
+
+  # Get the cluster size
+  cluster_size = length(cluster_samples)
+
+  # Get the number of category samples in the cluster.
+  osa_cat_indexes = which(osa$Sample %in% names(ematrix)[cluster_samples])
+  num_cat_samples = length(which(osa[[field]][osa_cat_indexes] == category))
+
+  # How many samples belong to this category
+  num_cat = length(which(osa[[field]] == category))
+
+  # Test #1
+  # successes = number of category samples in the cluster
+  # failures = number of non category samples in the cluster
+  # Ho: successes = 0.85
+  # Ha: successes > 0.85
+  p1= binom.test(num_cat_samples, cluster_size, p=p_succ, alternative='greater')
+
+  # Test #2
+  # successes = number of category samples in the cluster
+  # failures = number of category samples out of the cluster
+  # Ho: successes = 0.85
+  # Ha: successes > 0.85
+  p2 = binom.test(num_cat_samples, num_cat, p=p_succ, alternative='greater')
+
+  # Return the maximum p-value
+  p.value = max(p1$p.value, p2$p.value)
+
+  if (verbose) {
+    print(p1)
+    print(p2)
+
+  }
+
   return(p.value)
 }
 
@@ -165,29 +252,28 @@ sampleClusterFTest = function(category, field, osa, net, ematrix, cluster_sample
 #' @param field
 #'   The field in the osa variable on which enrichment will be performed.
 #' @param test
-#'   The statistical test to perform.  This is 'fishers' for an enrichment
-#'   test.
-#' @param samples
-#'   Limit the analysis to only the samples indexes provided.
+#'   The statistical test to perform: 'fishers' or 'binomial'
+#' @param binom_s
+#'   The probabilty of success for the binomial test.  Or, in other words,
+#'   the percentage of expected samples for a category in the cluster.
 #' @export
 #'
 #' @examples
 #'
-analyzeEdgeCat = function(i, osa, net, ematrix, field, test = 'fishers', samples=c()) {
+analyzeEdgeCat = function(i, osa, net, ematrix, field, test = 'fishers', binom_s = 0.85) {
 
   sample_types = as.character(osa[[field]])
   num_samples = length(sample_types)
 
-  # Convert the sample string to a numerical vector.
-  edge_samples = getEdgeSamples(i, net)
-  if (length(samples) > 0) {
-    edge_samples = samples
-  }
-
   categories = unique(osa[[field]])
 
   if (test == 'fishers') {
-    pvals = sapply(categories, sampleClusterFTest, field, osa, net, ematrix, edge_samples, alternative = 'greater')
+    pvals = sapply(categories, performClusterFishersTest, field, i, net, osa, ematrix, FALSE)
+    names(pvals) = categories
+    return(pvals);
+  }
+  if (test == 'binomial') {
+    pvals = sapply(categories, performClusterBinomialTest, field, i, net, osa, ematrix, binom_s, FALSE)
     names(pvals) = categories
     return(pvals);
   }
@@ -212,16 +298,16 @@ analyzeEdgeCat = function(i, osa, net, ematrix, field, test = 'fishers', samples
 #'   The method to apply for multiple testing correction. Valid values are identical
 #'   to those available to the p.adjust function.  The default is to
 #'   apply 'hochberg' correction.
-#' @param samples
-#'   Limit the analysis to only the samples indexes provided.
 #' @param progressBar
 #'   Set to FALSE to repress progress bar
-#'
+#' @param binom_s
+#'   The probabilty of success for the binomial test.  Or, in other words,
+#'   the percentage of expected samples for a category in the cluster.
 #' @export
 #'
 analyzeNetCat = function(net, osa, ematrix, field, test = 'fishers',
-                         correction = 'hochberg', samples = c(),
-                         progressBar = TRUE ) {
+                         correction = 'hochberg', progressBar = TRUE,
+                         binom_s = 0.85) {
 
   sample_types = as.character(osa[[field]])
   categories = unique(sample_types)
@@ -246,7 +332,7 @@ analyzeNetCat = function(net, osa, ematrix, field, test = 'fishers',
 
     # Calculate the probability that this edge is a result of any specific
     # known experimental condition (i.e. category) for the given field.
-    p.vals = analyzeEdgeCat(i, osa, net, ematrix, field, test = test, samples = samples)
+    p.vals = analyzeEdgeCat(i, osa, net, ematrix, field, test = test, binom_s)
     for (category in names(p.vals)) {
       subname = paste(field, category, sep='_')
       net2[i, subname] = p.vals[category]

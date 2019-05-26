@@ -5,7 +5,7 @@
 \title{Performs significant testing of a single edge in the network for a set of annotation categories.}
 \usage{
 analyzeEdgeCat(i, osa, net, ematrix, field, test = "fishers",
-  samples = c())
+  binom_s = 0.85)
 }
 \arguments{
 \item{i}{The index of the edge in the network}
@@ -21,10 +21,10 @@ function imports a dataframe in the correct format for this function.}
 
 \item{field}{The field in the osa variable on which enrichment will be performed.}
 
-\item{test}{The statistical test to perform.  This is 'fishers' for an enrichment
-test.}
+\item{test}{The statistical test to perform: 'fishers' or 'binomial'}
 
-\item{samples}{Limit the analysis to only the samples indexes provided.}
+\item{binom_s}{The probabilty of success for the binomial test.  Or, in other words,
+the percentage of expected samples for a category in the cluster.}
 }
 \description{
 Performs significant testing of a single edge in the network for a set of annotation categories.

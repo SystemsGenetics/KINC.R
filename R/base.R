@@ -7,7 +7,7 @@
 #'    A dataframe containing the network file contents
 #'
 #' @export
-loadNetwork = function(network_file, KINC_version = '1.0') {
+loadKINCNetwork = function(network_file, KINC_version = '1.0') {
   # Load in the KINC network file
   colNames = c(
     "Source", "Target", "sc", "Interaction", "Cluster",
@@ -23,6 +23,20 @@ loadNetwork = function(network_file, KINC_version = '1.0') {
     sep="\t", colClasses=colClasses, col.names=colNames)
 
 }
+
+#' Exports a network data frame as a KINC compatible file.
+#'
+#' @param net
+#'   A network data frame containing the KINC-produced network.  The loadNetwork
+#'   function imports a dataframe in the correct format for this function.
+#' @param network_file
+#'   The path to which the network file will be saved.
+#'
+#' @export
+saveKINCNetwork = function(net, network_file) {
+  write.table(net, file= network_file, sep = "\t", na="NA", quote=FALSE, row.names=FALSE, col.names=TRUE)
+}
+
 #' Imports sample annotations.
 #'
 #' The format of the sample annotation file is tab delimited where the
@@ -280,6 +294,37 @@ plot3DEdgeList = function(edge_indexes, osa, net, ematrix, field, label_field = 
   }
 }
 
+#' Plots a scatterplot of gene expression across a set of samples.
+#'
+#' Samples will be ordered by the values of field.
+#'
+#' @param gene
+#'   The name of the gene to plot
+#' @param ematrix
+#'   The expression matrix.
+#' @param osa
+#'   The sample annotation matrix. One column must contain the header 'Sample'
+#'   and the remaining colums correspond to an annotation type.  The rows
+#'   of the anntation columns should contain the annotations.
+#' @param field
+#'   The name of the field by which to order the points along the
+#'   x-axis.
+#' @param xlab
+#'   The label for the x-axis of the plot.
+#' @export
+plotGene = function(gene, ematrix, osa, field, xlab = field) {
+  condition = osa[c(field)]
+  expdata = merge(t(ematrix[gene,]), condition, by="row.names")
+  colnames(expdata) = c('Sample', 'y', 'x')
+  expdata = expdata[complete.cases(expdata),]
+
+  expplot = ggplot(expdata, aes(x, y)) +
+    geom_point(size=1) +
+    xlab(xlab) + ylab('Expression Level')
+  print(expplot)
+  return(expplot)
+}
+
 #' Plots a 2D scatterplot for a given list of edges.
 #'
 #' @param edge_indexes
@@ -299,9 +344,15 @@ plot3DEdgeList = function(edge_indexes, osa, net, ematrix, field, label_field = 
 #' @param samples
 #'   An array of sample names for which the scatterplot should be included in the plot.
 #'   If no value is provided then all samples with values are included.
+#' @param highlight
+#'   If set to TRUE, makes the samples belonging to the cluster that
+#'   underlies the edge larger in the plot. Default = TRUE.
+#' @param title
+#'   A title to give the plot. Default = NULL
 #' @export
 plot2DEdgeList = function(edge_indexes, osa, net, ematrix,
-                          field = NA, samples = NA) {
+                          field = NA, samples = NA, highlight = TRUE,
+                          title = NULL) {
   j = 1
   done = FALSE;
   while (!done) {
@@ -325,9 +376,9 @@ plot2DEdgeList = function(edge_indexes, osa, net, ematrix,
       condition = osa[[field]]
     }
 
-    size = rep(0.3, length(x))
-    if (length(sample_indexes) > 0) {
-      size[sample_indexes] = 1
+    size = rep(0.25, length(x))
+    if (highlight & length(sample_indexes) > 0) {
+      size[sample_indexes] = 1.5
     }
 
     coexpdata = data.frame(source = x, target = y, category = condition, size = size)
@@ -339,10 +390,13 @@ plot2DEdgeList = function(edge_indexes, osa, net, ematrix,
     if (!is.numeric(condition[0])) {
       coexpplot = coexpplot + scale_color_brewer(palette="Set1")
     }
+    if (!is.null(title)) {
+      coexpplot = coexpplot + ggtitle(title)
+    }
     print(coexpplot)
 
     if (length(edge_indexes) == 1) {
-      return()
+      return(coexpplot)
     }
     # Use the key press to navigate through the images.
     val = readline(prompt=paste("Edge: ", i, '. ', j, " of ", length(edge_indexes), ". Type control keys the [enter]. Keys: n > forward, b > backwards, q > quit.", sep=""))
@@ -394,9 +448,7 @@ findLinkedCommunities = function(net, file_prefix, module_prefix = 'M', sim_col 
   new_net = net
   new_net$Module = NA
 
-  # Linked community method doesn't do well with disconnected graphs. So, first we want
-  # to decompose the graph into its disjointed subgraphs.  If the callee doesn't want
-  # modules to span inverse edges then remove those.
+  # If the user requested to ignore inverse correlation edges we'll take those out.
   if (ignore_inverse) {
     g = graph.edgelist(as.matrix(net[which(net[[sim_col]] > 0), c('Source', 'Target')]), directed = F)
     E(g)$weight = abs(net[which(net[[sim_col]] > 0), sim_col])
@@ -405,6 +457,13 @@ findLinkedCommunities = function(net, file_prefix, module_prefix = 'M', sim_col 
     g = graph.edgelist(as.matrix(net[, c('Source', 'Target')]), directed = F)
     E(g)$weight = abs(net[, sim_col])
   }
+
+  # Remove duplicated edges or it drammatically slows down cluster merging.
+  #g = unique(g)
+
+  # Linked community method doesn't do well with disconnected graphs. So, we want
+  # to decompose the graph into its disjointed subgraphs.  If the callee doesn't want
+  # modules to span inverse edges then remove those.
   subg = decompose(g,  min.vertices = 30);
 
   lcs = list()
@@ -426,6 +485,12 @@ findLinkedCommunities = function(net, file_prefix, module_prefix = 'M', sim_col 
     # are not connected.
     if (meta) {
       r = mergeCommunities(lc)
+    }
+    else {
+      r = list(
+        cedges = lc$clusters,
+        cnodes = lc$nodeclusters
+      )
     }
 
     lcs[[gi]] = r
@@ -459,7 +524,7 @@ findLinkedCommunities = function(net, file_prefix, module_prefix = 'M', sim_col 
   write.table(new_net, file=paste(file_prefix, "coexpnet.edges.lcm.txt", sep=".") ,sep="\t", row.names=FALSE, append=FALSE, quote=FALSE)
 
   # Write out the node list
-  node_list = data.frame(Node=c(new_net$Source, new_net$Target), Cluster=c(new_net$Module, new_net$Module))
+  node_list = data.frame(Node=c(as.character(new_net$Source), as.character(new_net$Target)), Cluster=c(new_net$Module, new_net$Module))
   write.table(unique(node_list), file=paste(file_prefix, "coexpnet.edges.lcmByNodes.txt", sep=".") ,sep="\t", row.names=FALSE, append=FALSE, quote=FALSE, col.names=FALSE)
 
   # convert the edge and cluster into a report of modules by edge which can

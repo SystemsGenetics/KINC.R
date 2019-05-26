@@ -5,7 +5,7 @@
 \title{Performs significant testing of each edge in the network for a set of annotation categories.}
 \usage{
 analyzeNetCat(net, osa, ematrix, field, test = "fishers",
-  correction = "hochberg", samples = c(), progressBar = TRUE)
+  correction = "hochberg", progressBar = TRUE, binom_s = 0.85)
 }
 \arguments{
 \item{net}{A network data frame containing the KINC-produced network.  The loadNetwork
@@ -20,9 +20,10 @@ function imports a dataframe in the correct format for this function.}
 \item{test}{The statistical test to perform.  This is 'fishers' for an enrichment
 test.}
 
-\item{samples}{Limit the analysis to only the samples indexes provided.}
-
 \item{progressBar}{Set to FALSE to repress progress bar}
+
+\item{binom_s}{The probabilty of success for the binomial test.  Or, in other words,
+the percentage of expected samples for a category in the cluster.}
 
 \item{correction.}{The method to apply for multiple testing correction. Valid values are identical
 to those available to the p.adjust function.  The default is to
