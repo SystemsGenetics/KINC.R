@@ -21,6 +21,8 @@ loadKINCNetwork = function(network_file, KINC_version = '1.0') {
   )
   net = read.table(network_file, header = TRUE,
     sep="\t", colClasses=colClasses, col.names=colNames)
+  #net = read.big.matrix(network_file, sep="\t", header = TRUE,
+  #                      col.names=colNames, type=colClasses)
 
 }
 

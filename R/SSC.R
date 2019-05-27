@@ -192,10 +192,16 @@ performClusterFishersTest = function(category, field, i, net, osa, ematrix, verb
 #'   of the anntation columns should contain the annotations.
 #' @param ematrix
 #'   The expression matrix data frame.
-#' @param p_succ
-#'   The probabilty of success for the binomial test.  Or, in other words,
-#'   the percentage of expected samples for a category in the cluster.
-performClusterBinomialTest = function(category, field, i, net, osa, ematrix, p_succ = 0.85, verbose=FALSE) {
+#' @param t1_psucc
+#'   The probabilty of success for the first binomial test.  This value
+#'   indicates the percentage of samples in the cluster that must
+#'   belong to the category.
+#' @param t2_psucc
+#'   The probability of success for the second binomial test. This value
+#'   indicates the percentage of category samples that must belong
+#'   to the cluster.
+performClusterBinomialTest = function(category, field, i, net, osa, ematrix,
+                                      t1_psucc = 0.25, t2_psucc = 0.75, verbose=FALSE) {
 
   # Convert the sample string to a numerical vector.
   cluster_samples = getEdgeSamples(i, net)
@@ -203,34 +209,57 @@ performClusterBinomialTest = function(category, field, i, net, osa, ematrix, p_s
   # Get the cluster size
   cluster_size = length(cluster_samples)
 
-  # Get the number of category samples in the cluster.
-  osa_cat_indexes = which(osa$Sample %in% names(ematrix)[cluster_samples])
-  num_cat_samples = length(which(osa[[field]][osa_cat_indexes] == category))
-
   # How many samples belong to this category
-  num_cat = length(which(osa[[field]] == category))
+  num_category = length(which(osa[[field]] == category))
+  num_not_category = length(which(osa[[field]] != category))
+
+  # Get the indexes in the OSA of the samples that are in the cluster and not in
+  # the cluster.
+  cluster_osa_indexes = which(osa$Sample %in% names(ematrix)[cluster_samples])
+  non_cluster_osa_indexes = which(!osa$Sample %in% names(ematrix)[cluster_samples])
+
+  # Get the number of samples of the category that are in and not in the cluster.
+  num_category_in_cluster = length(which(osa[[field]][cluster_osa_indexes] == category))
+  num_category_not_in_cluster = num_category - num_category_in_cluster
+
+  # Get the number of samples not of the category that are in and not in the cluster.
+  num_other_in_cluster = length(which(osa[[field]][cluster_osa_indexes] != category))
+  num_other_not_in_cluster = num_not_category - num_other_in_cluster
 
   # Test #1
-  # successes = number of category samples in the cluster
-  # failures = number of non category samples in the cluster
-  # Ho: successes = 0.85
-  # Ha: successes > 0.85
-  p1= binom.test(num_cat_samples, cluster_size, p=p_succ, alternative='greater')
+  # successes = number of non-category samples in the cluster
+  # failures = number of non-category samples not in the cluster
+  # Ho: successes >= 0.15
+  # Ha: successes < 0.15
+  p1.pval = 0
+  if (num_not_category > 0) {
+    p1 = binom.test(num_other_in_cluster, num_not_category, p=t1_psucc, alternative='less')
+    p1.pval = p1$p.value
+  }
+
+  # Test #1b
+  # Perform the same test as #1 but for each other category separately.
 
   # Test #2
   # successes = number of category samples in the cluster
   # failures = number of category samples out of the cluster
   # Ho: successes = 0.85
   # Ha: successes > 0.85
-  p2 = binom.test(num_cat_samples, num_cat, p=p_succ, alternative='greater')
+  p2.pval = 0
+  if (num_category > 0) {
+    p2 = binom.test(num_category_in_cluster, num_category, p=t2_psucc, alternative='greater')
+    p2.pval = p2$p.value
+  }
 
   # Return the maximum p-value
-  p.value = max(p1$p.value, p2$p.value)
+  # TODO: perhaps we should employ a method of combining p-values rather
+  # than just using the minimum.
+  # https://academic.oup.com/bioinformatics/article/32/17/i430/2450768
+  p.value = max(p1.pval, p2.pval)
 
   if (verbose) {
     print(p1)
     print(p2)
-
   }
 
   return(p.value)
@@ -253,19 +282,33 @@ performClusterBinomialTest = function(category, field, i, net, osa, ematrix, p_s
 #'   The field in the osa variable on which enrichment will be performed.
 #' @param test
 #'   The statistical test to perform: 'fishers' or 'binomial'
-#' @param binom_s
-#'   The probabilty of success for the binomial test.  Or, in other words,
-#'   the percentage of expected samples for a category in the cluster.
+#' @param category
+#'   By default this function will cylce through all categories of the
+#'   'field' argument. But to limit the analysis to just one category set it here.
+#' @param t1_psucc
+#'   For the bionomial test only.
+#'   The probabilty of success for the first binomial test.  This value
+#'   indicates the percentage of samples in the cluster that must
+#'   belong to the category.
+#' @param t2_psucc
+#'   For the binomial test only.
+#'   The probability of success for the second binomial test. This value
+#'   indicates the percentage of category samples that must belong
+#'   to the cluster.
 #' @export
 #'
 #' @examples
 #'
-analyzeEdgeCat = function(i, osa, net, ematrix, field, test = 'fishers', binom_s = 0.85) {
+analyzeEdgeCat = function(i, osa, net, ematrix, field, test = 'fishers',
+                          category = NA, t1_psucc = 0.25, t2_psucc = 0.75) {
 
   sample_types = as.character(osa[[field]])
   num_samples = length(sample_types)
 
   categories = unique(osa[[field]])
+  if (!is.na(category)) {
+    categories = c(category)
+  }
 
   if (test == 'fishers') {
     pvals = sapply(categories, performClusterFishersTest, field, i, net, osa, ematrix, FALSE)
@@ -273,7 +316,7 @@ analyzeEdgeCat = function(i, osa, net, ematrix, field, test = 'fishers', binom_s
     return(pvals);
   }
   if (test == 'binomial') {
-    pvals = sapply(categories, performClusterBinomialTest, field, i, net, osa, ematrix, binom_s, FALSE)
+    pvals = sapply(categories, performClusterBinomialTest, field, i, net, osa, ematrix, t1_psucc, t2_psucc, FALSE)
     names(pvals) = categories
     return(pvals);
   }
@@ -300,14 +343,24 @@ analyzeEdgeCat = function(i, osa, net, ematrix, field, test = 'fishers', binom_s
 #'   apply 'hochberg' correction.
 #' @param progressBar
 #'   Set to FALSE to repress progress bar
-#' @param binom_s
-#'   The probabilty of success for the binomial test.  Or, in other words,
-#'   the percentage of expected samples for a category in the cluster.
+#' @param category
+#'   By default this function will cylce through all categories of the
+#'   'field' argument. But to limit the analysis to just one category set it here.
+#' @param t1_psucc
+#'   For the bionomial test only.
+#'   The probabilty of success for the first binomial test.  This value
+#'   indicates the percentage of samples in the cluster that must
+#'   belong to the category.
+#' @param t2_psucc
+#'   For the binomial test only.
+#'   The probability of success for the second binomial test. This value
+#'   indicates the percentage of category samples that must belong
+#'   to the cluster.
 #' @export
 #'
-analyzeNetCat = function(net, osa, ematrix, field, test = 'fishers',
+analyzeNetCat = function(net, osa, ematrix, field, test = 'binomial',
                          correction = 'hochberg', progressBar = TRUE,
-                         binom_s = 0.85) {
+                         category = NA, t1_psucc = 0.25, t2_psucc=0.75) {
 
   sample_types = as.character(osa[[field]])
   categories = unique(sample_types)
@@ -332,7 +385,8 @@ analyzeNetCat = function(net, osa, ematrix, field, test = 'fishers',
 
     # Calculate the probability that this edge is a result of any specific
     # known experimental condition (i.e. category) for the given field.
-    p.vals = analyzeEdgeCat(i, osa, net, ematrix, field, test = test, binom_s)
+    p.vals = analyzeEdgeCat(i, osa, net, ematrix, field, test = test,
+                            category, t1_psucc, t2_psucc)
     for (category in names(p.vals)) {
       subname = paste(field, category, sep='_')
       net2[i, subname] = p.vals[category]
@@ -342,10 +396,14 @@ analyzeNetCat = function(net, osa, ematrix, field, test = 'fishers',
     close(pb)
   }
 
-  # Perform multiple testing correction on the p-values
-  for (category in categories) {
-    subname = paste(field, category, sep='_')
-    net2[subname] = p.adjust(as.numeric(unlist(net2[subname])), method=correction)
+  # Perform multiple testing correction on the p-values. This may not
+  # be necessary because it overly reduces p-values from the binomial
+  # test, but for backwards compatiblity, let's leave it for fishers:
+  if (test == 'fishers') {
+    for (category in categories) {
+      subname = paste(field, category, sep='_')
+      net2[subname] = p.adjust(as.numeric(unlist(net2[subname])), method=correction)
+    }
   }
 
   return(net2);
