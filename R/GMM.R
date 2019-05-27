@@ -15,13 +15,16 @@
 #'   The minimum number of samples that must be present to identify a cluster. Default = 30.
 #' @param plot
 #'   Boolean indicating if the Rmixmod clusters scatterplot should be drawn. Default = FALSE
+#' @param iterations
+#'   The number of times to execute the GMM models.  The model with the fewest clusters from
+#'   all the iterations will be used.
 #' @return
 #'   Returns a data frame of edges in the same format as the network returned by
 #'   the loadNetwork function.
 #' @export
 #'
 getPairGMMEdges = function(source, target, ematrix, minc = 30,
-  method="spearman", th=0.5, plot=FALSE) {
+  method="spearman", th=0.5, plot=FALSE, iterations = 5) {
 
   # Get the source and target genes from the expression matrix
   x =  t(ematrix[source,])
@@ -53,18 +56,28 @@ getPairGMMEdges = function(source, target, ematrix, minc = 30,
   S[which(S$x %in% bx$out), 'stype'] = 7
   S[which(S$y %in% by$out), 'stype'] = 7
 
-  # Perform the GMM clustering.
-  X = S[which(S$stype == 0),]
-  xem = mixmodCluster(X[c("x", "y")], nbCluster=1:5, criterion="ICL")
+  # Define the models to use
+  models= mixmodGaussianModel(family='all', free.proportions = TRUE)
 
-  # Get the best set of clusters.
-  b=xem['bestResult']
+  # Perform the GMM clustering 5 times and take the one that has the
+  # fewest clusters.
+  X = S[which(S$stype == 0),]
+  best = NA
+  for (i in 1:iterations) {
+    xem = mixmodCluster(X[c("x", "y")], nbCluster=1:5, criterion="ICL")
+
+    # Get the best set of clusters.
+    temp=xem['bestResult']
+    if (typeof(best) == 'logical' || attributes(temp)$nbCluster < attributes(best)$nbCluster) {
+      best = temp
+    }
+  }
   if (plot) {
-    plotCluster(b, X, xlab=source, ylab=target, cex.lab=1.5, cex.axis=1.5)
+    plotCluster(best, X, xlab=source, ylab=target, cex.lab=1.5, cex.axis=1.5)
   }
 
   # Keep track of the cluster that each sample belongs to.
-  X$cluster = b@partition
+  X$cluster = best@partition
   S[X$index, 'cluster'] = X$cluster
 
   # Build the edges data frame, we'll return this when the function completes.
@@ -77,7 +90,7 @@ getPairGMMEdges = function(source, target, ematrix, minc = 30,
   # Itearate through the clusters, remove outliers, perform correlation
   # analyis and if the correlation value is > then the threshodl, add the
   # cluster as an edge.
-  for (ci in 1:b@nbCluster) {
+  for (ci in 1:best@nbCluster) {
 
     # Get the cluster points.
     cx = X$x[which(X$cluster == ci)]
@@ -113,7 +126,7 @@ getPairGMMEdges = function(source, target, ematrix, minc = 30,
 
       # Create a new edge dataframe and merge it into our edges data frame.
       edge = data.frame(Source = source, Target = target, sc = r, Interaction = 'co', Cluster = ci,
-                       Num_Clusters = b@nbCluster, Cluster_Samples = length(cx),
+                       Num_Clusters = best@nbCluster, Cluster_Samples = length(cx),
                        Missing_Samples = length(which(S$stype == 9)),
                        Cluster_Outliers = length(which(S$stype == 8)),
                        Pair_Outliers = length(which(S$stype == 7)),
@@ -159,15 +172,16 @@ countEmatrixModes = function(ematrix, minc = 30, plot=FALSE, progressBar = TRUE)
     }
 
     # Perform GMMs on this edge
-    xem = mixmodCluster(gene, nbCluster=1:5, criterion="ICL")
+    models= mixmodGaussianModel(family='all', free.proportions = TRUE)
+    xem = mixmodCluster(gene, nbCluster=1:5, criterion="ICL", models = models)
 
     # Get the best set of clusters.
-    b=xem['bestResult']
+    best=xem['bestResult']
     if (plot) {
       hist(xem)
     }
 
-    counts[i] = b@nbCluster
+    counts[i] = best@nbCluster
   }
 
   # Close down the progress bar.

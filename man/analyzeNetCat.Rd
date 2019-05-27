@@ -4,8 +4,9 @@
 \alias{analyzeNetCat}
 \title{Performs significant testing of each edge in the network for a set of annotation categories.}
 \usage{
-analyzeNetCat(net, osa, ematrix, field, test = "fishers",
-  correction = "hochberg", progressBar = TRUE, binom_s = 0.85)
+analyzeNetCat(net, osa, ematrix, field, test = "binomial",
+  correction = "hochberg", progressBar = TRUE, category = NA,
+  t1_psucc = 0.25, t2_psucc = 0.75)
 }
 \arguments{
 \item{net}{A network data frame containing the KINC-produced network.  The loadNetwork
@@ -22,8 +23,18 @@ test.}
 
 \item{progressBar}{Set to FALSE to repress progress bar}
 
-\item{binom_s}{The probabilty of success for the binomial test.  Or, in other words,
-the percentage of expected samples for a category in the cluster.}
+\item{category}{By default this function will cylce through all categories of the
+'field' argument. But to limit the analysis to just one category set it here.}
+
+\item{t1_psucc}{For the bionomial test only.
+The probabilty of success for the first binomial test.  This value
+indicates the percentage of samples in the cluster that must
+belong to the category.}
+
+\item{t2_psucc}{For the binomial test only.
+The probability of success for the second binomial test. This value
+indicates the percentage of category samples that must belong
+to the cluster.}
 
 \item{correction.}{The method to apply for multiple testing correction. Valid values are identical
 to those available to the p.adjust function.  The default is to

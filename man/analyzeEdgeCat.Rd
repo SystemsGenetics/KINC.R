@@ -5,7 +5,7 @@
 \title{Performs significant testing of a single edge in the network for a set of annotation categories.}
 \usage{
 analyzeEdgeCat(i, osa, net, ematrix, field, test = "fishers",
-  binom_s = 0.85)
+  category = NA, t1_psucc = 0.25, t2_psucc = 0.75)
 }
 \arguments{
 \item{i}{The index of the edge in the network}
@@ -23,8 +23,18 @@ function imports a dataframe in the correct format for this function.}
 
 \item{test}{The statistical test to perform: 'fishers' or 'binomial'}
 
-\item{binom_s}{The probabilty of success for the binomial test.  Or, in other words,
-the percentage of expected samples for a category in the cluster.}
+\item{category}{By default this function will cylce through all categories of the
+'field' argument. But to limit the analysis to just one category set it here.}
+
+\item{t1_psucc}{For the bionomial test only.
+The probabilty of success for the first binomial test.  This value
+indicates the percentage of samples in the cluster that must
+belong to the category.}
+
+\item{t2_psucc}{For the binomial test only.
+The probability of success for the second binomial test. This value
+indicates the percentage of category samples that must belong
+to the cluster.}
 }
 \description{
 Performs significant testing of a single edge in the network for a set of annotation categories.
