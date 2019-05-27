@@ -299,7 +299,7 @@ performClusterBinomialTest = function(category, field, i, net, osa, ematrix,
 #'
 #' @examples
 #'
-analyzeEdgeCat = function(i, osa, net, ematrix, field, test = 'fishers',
+analyzeEdgeCat = function(i, osa, net, ematrix, field, test = 'binomial',
                           category = NA, t1_psucc = 0.25, t2_psucc = 0.75) {
 
   sample_types = as.character(osa[[field]])
@@ -362,13 +362,17 @@ analyzeNetCat = function(net, osa, ematrix, field, test = 'binomial',
                          correction = 'hochberg', progressBar = TRUE,
                          category = NA, t1_psucc = 0.25, t2_psucc=0.75) {
 
+  # Get the list of categories to analyze.
   sample_types = as.character(osa[[field]])
   categories = unique(sample_types)
+  if (!is.na(category)) {
+    categories = c(category)
+  }
 
   # Add in new columns for each category.
   net2 = net
-  for (category in categories) {
-    subname = paste(field, category, sep='_')
+  for (label in categories) {
+    subname = paste(field, label, sep='_')
     net2[subname] = NA
   }
 
@@ -387,9 +391,9 @@ analyzeNetCat = function(net, osa, ematrix, field, test = 'binomial',
     # known experimental condition (i.e. category) for the given field.
     p.vals = analyzeEdgeCat(i, osa, net, ematrix, field, test = test,
                             category, t1_psucc, t2_psucc)
-    for (category in names(p.vals)) {
-      subname = paste(field, category, sep='_')
-      net2[i, subname] = p.vals[category]
+    for (label in names(p.vals)) {
+      subname = paste(field, label, sep='_')
+      net2[i, subname] = p.vals[label]
     }
   }
   if (progressBar){
