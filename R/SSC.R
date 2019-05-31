@@ -38,6 +38,56 @@ getSampleStringArray <-function(i, net){
   edge_samples = as.numeric(strsplit(sample_str, "")[[1]])
   return(edge_samples)
 }
+#' Creates an Edge Expression Matrix (EEM) from a network data frame.
+#'
+#' The EEM is an n x m*2 array were n is the number of samples in the annotation matrix and
+#' m is the number of edges in the network. Each edge is represented in the matrix by two columns
+#' with each containing gene expression of the source and target genes respectively.
+#'
+#' @param net
+#'   A network data frame containing the KINC-produced network.  The loadNetwork
+#'   function imports a dataframe in the correct format for this function.
+#' @param osa
+#'   The ordered sample annotation data frame.
+#' @param ematrix
+#'   The expression matrix data frame.
+#'
+#' @return
+#'    An nxm*2 dataframe contianing the EEM
+#' @export
+getEdgeExpressionMatrix <- function(net, osa, ematrix) {
+  samples = osa$Sample
+  num_edges = dim(net)[1]
+  sm = data.frame(matrix(NA, nrow=length(samples), ncol=num_edges*2))
+  row.names(sm) = samples
+  cnames = vector(mode="character", length=num_edges*2)
+  for (i in 1:num_edges) {
+    print(paste(i,'of',num_edges))
+
+    # Get the sample string in array form.
+    edge_samples = getSampleStringArray(i, net)
+
+    # Get the gene expression for the source and target genes of the edge.
+    source = net[i, 'Source']
+    target = net[i, 'Target']
+    sourceExp = ematrix[source,]
+    targetExp = ematrix[target,]
+
+    # Create names for the EEM columns.
+    cnames[i*2-1] = paste('E', i, "_", source, sep="")
+    cnames[i*2] = paste('E', i, "_", target, sep="")
+
+    # Remove expression from non-edge samples
+    sourceExp[which(edge_samples != 1)] = 0
+    targetExp[which(edge_samples != 1)] = 0
+
+    # Add the new columns.
+    sm[,i*2-1] = t(sourceExp)
+    sm[,i*2] = t(targetExp)
+  }
+  colnames(sm) = cnames
+  return(sm)
+}
 #' Performs hierarchical clustering of edges in a network based on their sample compositions.
 #'
 #' This function uses the dist function to calucate a distance and the

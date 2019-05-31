@@ -26,6 +26,13 @@
 getPairGMMEdges = function(source, target, ematrix, minc = 30,
   method="spearman", th=0.5, plot=FALSE, iterations = 5) {
 
+  # Build the edges data frame, we'll return this when the function completes.
+  edges = data.frame(Source = character(), Target = character(), sc = numeric(),
+                     Interaction = character(), Cluster = numeric(),
+                     Num_Clusters = numeric(), Cluster_Samples = numeric(), Missing_Samples = numeric(),
+                     Cluster_Outliers = numeric(), Pair_Outliers = numeric(), Too_Low = numeric(),
+                     Samples = character(), stringsAsFactors = FALSE)
+
   # Get the source and target genes from the expression matrix
   x =  t(ematrix[source,])
   y =  t(ematrix[target,])
@@ -56,14 +63,34 @@ getPairGMMEdges = function(source, target, ematrix, minc = 30,
   S[which(S$x %in% bx$out), 'stype'] = 7
   S[which(S$y %in% by$out), 'stype'] = 7
 
+  # Make the dataframe for MixMod
+  X = S[which(S$stype == 0),]
+
+  # If the source and target are identifical we should not
+  # continue as it will throw off MixMod.
+  if (sum(X$x - X$y) == 0) {
+    # Create the sample string
+    S[which(S$type == 0)]$stype = 1
+    sample_str = paste(S$stype, sep='', collapse='')
+
+    edge = data.frame(Source = source, Target = target, sc = 1, Interaction = 'co', Cluster = 1,
+                      Num_Clusters = 1, Cluster_Samples = length(X$x),
+                      Missing_Samples = length(which(S$stype == 9)),
+                      Cluster_Outliers = length(which(S$stype == 8)),
+                      Pair_Outliers = length(which(S$stype == 7)),
+                      Too_Low = 0, Samples = sample_str, stringsAsFactors=FALSE)
+    edges = rbind(edges, edge)
+    return (edges)
+  }
+
   # Define the models to use
   models= mixmodGaussianModel(family='all', free.proportions = TRUE)
 
   # Perform the GMM clustering 5 times and take the one that has the
   # fewest clusters.
-  X = S[which(S$stype == 0),]
   best = NA
   for (i in 1:iterations) {
+    # print(paste(source,target))
     xem = mixmodCluster(X[c("x", "y")], nbCluster=1:5, criterion="ICL")
 
     # Get the best set of clusters.
@@ -79,13 +106,6 @@ getPairGMMEdges = function(source, target, ematrix, minc = 30,
   # Keep track of the cluster that each sample belongs to.
   X$cluster = best@partition
   S[X$index, 'cluster'] = X$cluster
-
-  # Build the edges data frame, we'll return this when the function completes.
-  edges = data.frame(Source = character(), Target = character(), sc = numeric(),
-                     Interaction = character(), Cluster = numeric(),
-                     Num_Clusters = numeric(), Cluster_Samples = numeric(), Missing_Samples = numeric(),
-                     Cluster_Outliers = numeric(), Pair_Outliers = numeric(), Too_Low = numeric(),
-                     Samples = character(), stringsAsFactors = FALSE)
 
   # Itearate through the clusters, remove outliers, perform correlation
   # analyis and if the correlation value is > then the threshodl, add the
