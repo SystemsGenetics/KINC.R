@@ -316,7 +316,7 @@ performClusterBinomialTest = function(category, field, i, net, osa, ematrix,
   # The p-value returned will be compared to the p.value from above. This is to eliminate non-biologically
   # relevant edges
   if(num_not_category > 2){
-    p.value = max(p.value, performClusterTTest(i,net, ematrix, num_not_category, num_category, cluster_osa_indexes, non_cluster_osa_indexes))
+    p.value = max(p.value, performClusterTTest(i, net, ematrix, num_not_category, num_category, cluster_osa_indexes, non_cluster_osa_indexes))
   }
 
   return(p.value)

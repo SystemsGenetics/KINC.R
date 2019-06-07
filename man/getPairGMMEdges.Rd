@@ -5,7 +5,7 @@
 \title{Performs pair-wise Gaussian Mixture Models (GMM) on a pair of genes}
 \usage{
 getPairGMMEdges(source, target, ematrix, minc = 30,
-  method = "spearman", th = 0.5, plot = FALSE)
+  method = "spearman", th = 0.5, plot = FALSE, iterations = 5)
 }
 \arguments{
 \item{source}{The name of the source gene.}
@@ -22,6 +22,9 @@ getPairGMMEdges(source, target, ematrix, minc = 30,
 absolute value of this number is kept as an edge. Derfault = 0.5.}
 
 \item{plot}{Boolean indicating if the Rmixmod clusters scatterplot should be drawn. Default = FALSE}
+
+\item{iterations}{The number of times to execute the GMM models.  The model with the fewest clusters from
+all the iterations will be used.}
 }
 \value{
 Returns a data frame of edges in the same format as the network returned by
