@@ -2,8 +2,7 @@
 % Please edit documentation in R/TT.R
 \name{TtestEdgeCat}
 \alias{TtestEdgeCat}
-\title{Performs a weltch's t-test on the two genes of an edge. Returns 1 if there is not enough power to do test,
-otherwise will return t-test stat for both genes}
+\title{T-test Edge}
 \usage{
 TtestEdgeCat(i, net, ematrix)
 }

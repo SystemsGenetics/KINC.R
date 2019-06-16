@@ -1,6 +1,8 @@
-
+#' T-test Edge
+#' 
 #' Performs a weltch's t-test on the two genes of an edge. Returns 1 if there is not enough power to do test,
 #' otherwise will return t-test stat for both genes
+#' 
 #' @param i
 #'   The index of the edge in the network
 #' @param net
@@ -10,6 +12,8 @@
 #'   reduced by analyzeNetCat.
 #' @param ematrix
 #'   The expression matrix data frame.
+#'   
+#' @export
 TtestEdgeCat = function(i, net, ematrix){
 
   # Gets the name of the Target and the Source gene
@@ -48,7 +52,11 @@ TtestEdgeCat = function(i, net, ematrix){
 
   
 
+#' T-test Net
+#' 
 #' Performs a weltch's t-test on a network
+#' 
+#' 
 #' @param net
 #'   A network data frame containing the KINC-produced network.  The loadNetwork
 #'   function imports a dataframe in the correct format for this function.
@@ -58,6 +66,8 @@ TtestEdgeCat = function(i, net, ematrix){
 #'   The expression matrix data frame.
 #' @param progressBar
 #'   Set to FALSE to repress progress bar
+#' 
+#' @export
 TtestNetCat = function(net, ematrix, progressBar = TRUE){
   # Add in new columns for the Ttest
   net2 = net

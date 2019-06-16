@@ -2,7 +2,7 @@
 % Please edit documentation in R/TT.R
 \name{TtestNetCat}
 \alias{TtestNetCat}
-\title{Performs a weltch's t-test on a network}
+\title{T-test Net}
 \usage{
 TtestNetCat(net, ematrix, progressBar = TRUE)
 }
