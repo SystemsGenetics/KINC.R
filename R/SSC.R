@@ -19,6 +19,28 @@ getEdgeSamples <- function(i, net) {
   return (sample_indexes)
 }
 
+#' Converts an edge sample string into an array of indexes of samples belonging to the Noncluseter.
+#' This was made so that I can control which edges are included (0,7,8,9)
+#'
+#' @param i
+#'   The index of the edge in the network
+#' @param net
+#'   A network dataframe containing the KINC-produced network.  The loadNetwork
+#'   function imports a dataframe in the correct format for this function.
+#' @return
+#'   An array of sample indexes that are part of the Noncluster. Because these
+#'   indexes are derived from the edge sample string they indexes should
+#'   correspond to the order of samples in the expression matrix.
+#' @export
+getNonEdgeSamples <- function(i, net) {
+  # Convert the sample string to a numerical vector.  
+  edge = net[i,]
+  sample_str = edge$Samples
+  edge_samples = as.numeric(strsplit(sample_str, "")[[1]])
+  sample_indexes = which(edge_samples == 0 | edge_samples == 7 ) #|| edge_samples == 7 || edge_samples == 8 || edge_samples == 9
+  return (sample_indexes)
+}
+
 #' Converts and edge sample string into an array.
 #'
 #' @param i
@@ -63,24 +85,24 @@ getEdgeExpressionMatrix <- function(net, osa, ematrix) {
   cnames = vector(mode="character", length=num_edges*2)
   for (i in 1:num_edges) {
     print(paste(i,'of',num_edges))
-
+    
     # Get the sample string in array form.
     edge_samples = getSampleStringArray(i, net)
-
+    
     # Get the gene expression for the source and target genes of the edge.
     source = net[i, 'Source']
     target = net[i, 'Target']
     sourceExp = ematrix[source,]
     targetExp = ematrix[target,]
-
+    
     # Create names for the EEM columns.
     cnames[i*2-1] = paste('E', i, "_", source, sep="")
     cnames[i*2] = paste('E', i, "_", target, sep="")
-
+    
     # Remove expression from non-edge samples
     sourceExp[which(edge_samples != 1)] = 0
     targetExp[which(edge_samples != 1)] = 0
-
+    
     # Add the new columns.
     sm[,i*2-1] = t(sourceExp)
     sm[,i*2] = t(targetExp)
@@ -106,7 +128,7 @@ getEdgeExpressionMatrix <- function(net, osa, ematrix) {
 #'    clustering process.
 #'
 clusterEdges = function(net, distMethod = "manhattan", hclustMethod = "ward.D2") {
-
+  
   # Convert the samples strings into a matrix.
   num_samples = nchar(net$Samples[1])
   sample_strs = net$Samples
@@ -117,11 +139,11 @@ clusterEdges = function(net, distMethod = "manhattan", hclustMethod = "ward.D2")
   })
   colnames(samples) = c()
   samples=t(samples)
-
+  
   # Perform clustering on the sample tree
   sample_dist  = dist(samples, method = distMethod)
   tree = hclust(sample_dist, method = hclustMethod)
-
+  
   return(tree)
 }
 
@@ -150,7 +172,7 @@ getSampleMatrix = function(net) {
   })
   colnames(samples) = c()
   samples = t(samples)
-
+  
   return(samples)
 }
 
@@ -180,14 +202,14 @@ getSampleMatrix = function(net) {
 #' @param samples
 #'   Limit the analysis to only the samples indexes provided.
 performClusterFishersTest = function(category, field, i, net, osa, ematrix, verbose=FALSE) {
-
+  
   # Convert the sample string to a numerical vector.
   cluster_samples = getEdgeSamples(i, net)
-
+  
   # Get osa elements for samples that belong to the cluster and those that don't.
   osa_cat_indexes = which(osa$Sample %in% names(ematrix)[cluster_samples])
   osa_out_indexes = which(!osa$Sample %in% names(ematrix)[cluster_samples])
-
+  
   #  Contingency matrix for each category in a cluster:
   #
   #                   Is Cat  Not Cat    Totals
@@ -201,7 +223,7 @@ performClusterFishersTest = function(category, field, i, net, osa, ematrix, verb
   n12 = length(which(osa[[field]][osa_cat_indexes] != category))
   n21 = length(which(osa[[field]][osa_out_indexes] == category))
   n22 = length(which(osa[[field]][osa_out_indexes] != category))
-
+  
   contmatrix = matrix(
     as.numeric(c(n11, n21, n12, n22)),
     nr=2,
@@ -210,7 +232,7 @@ performClusterFishersTest = function(category, field, i, net, osa, ematrix, verb
       Is_Category = c("Yes", "No")
     )
   )
-
+  
   if (verbose) {
     print(contmatrix)
   }
@@ -252,30 +274,30 @@ performClusterFishersTest = function(category, field, i, net, osa, ematrix, verb
 #'   to the cluster.
 performClusterBinomialTest = function(category, field, i, net, osa, ematrix,
                                       t1_psucc = 0.25, t2_psucc = 0.75, verbose=FALSE) {
-
+  
   # Convert the sample string to a numerical vector.
   cluster_samples = getEdgeSamples(i, net)
-
+  
   # Get the cluster size
   cluster_size = length(cluster_samples)
-
+  
   # How many samples belong to this category
   num_category = length(which(osa[[field]] == category))
   num_not_category = length(which(osa[[field]] != category))
-
+  
   # Get the indexes in the OSA of the samples that are in the cluster and not in
   # the cluster.
   cluster_osa_indexes = which(osa$Sample %in% names(ematrix)[cluster_samples])
   non_cluster_osa_indexes = which(!osa$Sample %in% names(ematrix)[cluster_samples])
-
+  
   # Get the number of samples of the category that are in and not in the cluster.
   num_category_in_cluster = length(which(osa[[field]][cluster_osa_indexes] == category))
   num_category_not_in_cluster = num_category - num_category_in_cluster
-
+  
   # Get the number of samples not of the category that are in and not in the cluster.
   num_other_in_cluster = length(which(osa[[field]][cluster_osa_indexes] != category))
   num_other_not_in_cluster = num_not_category - num_other_in_cluster
-
+  
   # Test #1
   # successes = number of non-category samples in the cluster
   # failures = number of non-category samples not in the cluster
@@ -286,10 +308,10 @@ performClusterBinomialTest = function(category, field, i, net, osa, ematrix,
     p1 = binom.test(num_other_in_cluster, num_not_category, p=t1_psucc, alternative='less')
     p1.pval = p1$p.value
   }
-
+  
   # Test #1b
   # Perform the same test as #1 but for each other category separately.
-
+  
   # Test #2
   # successes = number of category samples in the cluster
   # failures = number of category samples out of the cluster
@@ -300,25 +322,18 @@ performClusterBinomialTest = function(category, field, i, net, osa, ematrix,
     p2 = binom.test(num_category_in_cluster, num_category, p=t2_psucc, alternative='greater')
     p2.pval = p2$p.value
   }
-
+  
   # Return the maximum p-value
   # TODO: perhaps we should employ a method of combining p-values rather
   # than just using the minimum.
   # https://academic.oup.com/bioinformatics/article/32/17/i430/2450768
   p.value = max(p1.pval, p2.pval)
-
+  
   if (verbose) {
     print(p1)
     print(p2)
   }
   
-  # If there are more than one sample in the non_cluster, this will call the "performClusterTTest" function
-  # The p-value returned will be compared to the p.value from above. This is to eliminate non-biologically
-  # relevant edges
-  if(num_not_category > 2){
-    p.value = max(p.value, performClusterTTest(i, net, ematrix, num_not_category, num_category, cluster_osa_indexes, non_cluster_osa_indexes))
-  }
-
   return(p.value)
 }
 
@@ -358,15 +373,15 @@ performClusterBinomialTest = function(category, field, i, net, osa, ematrix,
 #'
 analyzeEdgeCat = function(i, osa, net, ematrix, field, test = 'binomial',
                           category = NA, t1_psucc = 0.25, t2_psucc = 0.75) {
-
+  
   sample_types = as.character(osa[[field]])
   num_samples = length(sample_types)
-
+  
   categories = unique(osa[[field]])
   if (!is.na(category)) {
     categories = c(category)
   }
-
+  
   if (test == 'fishers') {
     pvals = sapply(categories, performClusterFishersTest, field, i, net, osa, ematrix, FALSE)
     names(pvals) = categories
@@ -377,7 +392,7 @@ analyzeEdgeCat = function(i, osa, net, ematrix, field, test = 'binomial',
     names(pvals) = categories
     return(pvals);
   }
-
+  
 }
 
 #' Performs significant testing of each edge in the network for a set of annotation categories.
@@ -418,32 +433,32 @@ analyzeEdgeCat = function(i, osa, net, ematrix, field, test = 'binomial',
 analyzeNetCat = function(net, osa, ematrix, field, test = 'binomial',
                          correction = 'hochberg', progressBar = TRUE,
                          category = NA, t1_psucc = 0.25, t2_psucc=0.75) {
-
+  
   # Get the list of categories to analyze.
   sample_types = as.character(osa[[field]])
   categories = unique(sample_types)
   if (!is.na(category)) {
     categories = c(category)
   }
-
+  
   # Add in new columns for each category.
   net2 = net
   for (label in categories) {
     subname = paste(field, label, sep='_')
     net2[subname] = NA
   }
-
+  
   # Intialize the progress bar
   if (progressBar){
     pb <- txtProgressBar(min = 0, max = nrow(net), style = 3)
   }
-
+  
   # Iterate through the rows of the network
   for (i in 1:nrow(net)) {
     if (progressBar){
       setTxtProgressBar(pb, i)
     }
-
+    
     # Calculate the probability that this edge is a result of any specific
     # known experimental condition (i.e. category) for the given field.
     p.vals = analyzeEdgeCat(i, osa, net, ematrix, field, test = test,
@@ -456,7 +471,7 @@ analyzeNetCat = function(net, osa, ematrix, field, test = 'binomial',
   if (progressBar){
     close(pb)
   }
-
+  
   # Perform multiple testing correction on the p-values. This may not
   # be necessary because it overly reduces p-values from the binomial
   # test, but for backwards compatiblity, let's leave it for fishers:
@@ -466,7 +481,7 @@ analyzeNetCat = function(net, osa, ematrix, field, test = 'binomial',
       net2[subname] = p.adjust(as.numeric(unlist(net2[subname])), method=correction)
     }
   }
-
+  
   return(net2);
 }
 #' Performs linear regression of a quantitative traits against a single edge in the network.
@@ -492,18 +507,18 @@ analyzeNetCat = function(net, osa, ematrix, field, test = 'binomial',
 analyzeEdgeQuant = function(i, osa, net, field, samples = c()) {
   source = net[i, 'Source']
   target = net[i, 'Target']
-
+  
   # Convert the sample string to a numerical vector.
   edge_samples = getEdgeSamples(i, net)
   if (length(samples) > 0) {
     edge_samples = samples
   }
-
+  
   # Build the expression vectors using only the samples provided.
   x = t(ematrix[source, edge_samples])
   y = t(ematrix[target, edge_samples])
   z = as.numeric(as.factor(osa[edge_samples, field]))
-
+  
   # If our z-dimension only has one value then there's no need to
   # perform a linear regression, so just return.
   if (dim(table(z)) == 1) {
@@ -513,7 +528,7 @@ analyzeEdgeQuant = function(i, osa, net, field, samples = c()) {
       model = NA
     ))
   }
-
+  
   # Use linear regression to obtain a p-value for the association.
   model = lm(y + x ~ z, data=data.frame(x=x, y=y, z=z))
   s = summary(model)
@@ -524,7 +539,7 @@ analyzeEdgeQuant = function(i, osa, net, field, samples = c()) {
     # Get the rate of change of the mean of y + x
     roccm = s$coefficients[2,1]
   }
-
+  
   return(list(
     p = pval,
     roccm = roccm,
@@ -554,12 +569,12 @@ analyzeEdgeQuant = function(i, osa, net, field, samples = c()) {
 #'
 analyzeNetQuant = function(net, osa, field, correction = 'hochberg',
                            samples = c(), progressBar = TRUE) {
-
+  
   # Add in new columns for each category.
   net2 = net
   net2[field] = NA
   net2[paste(field, '_roccm', sep='')] = NA
-
+  
   if(progressBar){pb <- txtProgressBar(min = 0, max = nrow(net), style = 3)}
   for (i in 1:nrow(net)) {
     if (progressBar){setTxtProgressBar(pb, i)}
@@ -568,21 +583,21 @@ analyzeNetQuant = function(net, osa, field, correction = 'hochberg',
     net2[i, paste(field, '_roccm', sep='')] = result[['roccm']]
   }
   if (progressBar){close(pb)}
-
+  
   # Perform multiple testing correction on the p-values
   net2[field] = p.adjust(as.numeric(unlist(net2[field])), method=correction)
-
+  
   return(net2);
 }
 
 analyzeNetDiffQuant = function(net, osa, field, model_samples = NA, test_samples,
                                progressBar = FALSE) {
-
+  
   # Add in new columns for each category.
   net2 = net
   column_name = paste(field, 'diff', paste(test_samples, collapse='_'), sep="-")
   net2[column_name] = NA
-
+  
   if(progressBar){pb <- txtProgressBar(min = 0, max = nrow(net), style = 3)}
   for (i in 1:nrow(net)) {
     if (progressBar){setTxtProgressBar(pb, i)}
@@ -590,29 +605,29 @@ analyzeNetDiffQuant = function(net, osa, field, model_samples = NA, test_samples
     net2[i, column_name] = median(result)
   }
   if (progressBar){close(pb)}
-
+  
   return(net2);
 }
 
 analyzeEdgeDiffQuant = function(i, osa, net, field, model_samples = c(), test_samples = c()) {
   source = net[i, 'Source']
   target = net[i, 'Target']
-
+  
   # Convert the sample string to a numerical vector.
   edge = net[i,]
   edge_samples = getEdgeSamples(edge$Samples)
   if (length(samples) > 0) {
     edge_samples = samples
   }
-
+  
   # Build the expression vectors using only the edges of the edge.
   x = t(ematrix[source, ])
   y = t(ematrix[target, ])
   z = as.numeric(as.factor(osa[, field]))
-
+  
   # Use linear regression to obtain a model for the samples the model samples group.
   model = lm(y + x ~ z, data=data.frame(x=x, y=y, z=z), subset = edge_samples)
-
+  
   # Now get the difference for the samples in the test_sample group
   obs = t(ematrix[source, test_samples]) + t(ematrix[target, test_samples])
   colnames(obs) = 'y + x'
@@ -639,11 +654,11 @@ analyzeEdgeDiffQuant = function(i, osa, net, field, model_samples = c(), test_sa
 #'   If this argument is not provided then the figure will be plotted to the
 #'   default devide rather than to a file.
 drawEdgeTreeHeatMap = function(sampleMatrix, tree, osa, fieldOrder, outfile_prefix = NA) {
-
+  
   # Reorder samples in the sampleMatrix according to the fieldOrder argument.
   sample_order = eval(parse(text=paste('order(osa$', paste(fieldOrder, collapse=' ,osa$'), ")", sep="")))
   sampleMatrix2 = sampleMatrix[, c(sample_order)]
-
+  
   categories = do.call(paste, list(c(osa[, fieldOrder[1]]), sep="-"))
   num_categories = length(unique(categories))
   osa$hmap_categories = categories
@@ -652,7 +667,7 @@ drawEdgeTreeHeatMap = function(sampleMatrix, tree, osa, fieldOrder, outfile_pref
     Color = rgb(runif(num_categories), runif(num_categories), runif(num_categories))
   )
   colColors = as.character(merge(osa[sample_order,], tColors, by.x="hmap_categories", by.y="Field", sort=FALSE)$Color)
-
+  
   if (!is.na(outfile_prefix)) {
     outfile = paste(outfile_prefix, paste(fieldOrder, collapse="-"), num_clusters, "png", sep=".")
     png(filename = outfile, width=3000, height=21000, res=300)
