@@ -21,9 +21,37 @@ loadKINCNetwork = function(network_file, KINC_version = '1.0') {
   )
   net = read.table(network_file, header = TRUE,
     sep="\t", colClasses=colClasses, col.names=colNames)
-  #net = read.big.matrix(network_file, sep="\t", header = TRUE,
-  #                      col.names=colNames, type=colClasses)
+  return (net)
+}
 
+#' Removes edges with insignificant powe
+#'
+#' @param net
+#'   A network data frame containing the KINC-produced network.  The loadNetwork
+#'   function imports a dataframe in the correct format for this function.
+#' @param sig.level
+#'   The signficance level (Type I error probability). Defaults to 0.01
+#' @param power
+#'   The power of the test (1 minuts Type II error probability)
+#'
+#' @return dataframe
+#'   A network dataframe with non-significant edges removed.
+#'
+#' @export
+applyDynamicPowerThreshold = function(net, sig.level=0.001, power=0.8) {
+
+  keep = rep(FALSE, nrow(net))
+  csizes = sort(unique(net$Cluster_Samples))
+
+  for (i in csizes) {
+    print(paste("Checking clusters of size", i, "..."))
+    pwr = pwr.r.test(n=i, sig.level = sig.level, power = power)
+    th = pwr$r
+    keep[which(net$Cluster_Samples == i & abs(net$sc) >= th)] = TRUE
+  }
+
+
+  return(net[which(keep == TRUE),])
 }
 
 #' Exports a network data frame as a KINC compatible file.
@@ -58,7 +86,7 @@ saveKINCNetwork = function(net, network_file) {
 #'
 #' @export
 loadSampleAnnotations = function (annotation_file, sample_order_file) {
-  sample_annots = read.table(annotation_file, sep="\t", header=TRUE, row.names=NULL)
+  sample_annots = read.table(annotation_file, sep="\t", header=TRUE, row.names=NULL, quote="", fill=TRUE)
   sample_order = read.table(sample_order_file, colClasses=c('character'),
                             col.names=c('Sample'))
   osa = merge(sample_order, sample_annots, by = "Sample", sort=FALSE)
@@ -314,15 +342,20 @@ plot3DEdgeList = function(edge_indexes, osa, net, ematrix, field, label_field = 
 #' @param xlab
 #'   The label for the x-axis of the plot.
 #' @export
-plotGene = function(gene, ematrix, osa, field, xlab = field) {
-  condition = osa[c(field)]
+plotGene = function(gene, ematrix, osa, field, xlab = field, colfield = field,
+                    show.legend=TRUE, title = NA) {
+  condition = osa[c(field, colfield)]
   expdata = merge(t(ematrix[gene,]), condition, by="row.names")
-  colnames(expdata) = c('Sample', 'y', 'x')
+  colnames(expdata) = c('Sample', 'y', 'x', 'z')
   expdata = expdata[complete.cases(expdata),]
 
-  expplot = ggplot(expdata, aes(x, y)) +
-    geom_point(size=1) +
-    xlab(xlab) + ylab('Expression Level')
+  expplot = ggplot(expdata, aes(x, y, color=z)) +
+    geom_point(size=1, show.legend = show.legend) +
+    xlab(xlab) + ylab(gene) +
+    theme(legend.title = element_blank())
+  if (!is.null(title)) {
+    expplot = expplot + ggtitle(title)
+  }
   print(expplot)
   return(expplot)
 }
@@ -354,7 +387,7 @@ plotGene = function(gene, ematrix, osa, field, xlab = field) {
 #' @export
 plot2DEdgeList = function(edge_indexes, osa, net, ematrix,
                           field = NA, samples = NA, highlight = TRUE,
-                          title = NULL) {
+                          title = NULL, show.legend=TRUE, legend.title = field) {
   j = 1
   done = FALSE;
   while (!done) {
@@ -379,6 +412,9 @@ plot2DEdgeList = function(edge_indexes, osa, net, ematrix,
     }
 
     size = rep(0.25, length(x))
+    if (!highlight) {
+      size = rep(1, length(x))
+    }
     if (highlight & length(sample_indexes) > 0) {
       size[sample_indexes] = 1.5
     }
@@ -387,11 +423,8 @@ plot2DEdgeList = function(edge_indexes, osa, net, ematrix,
     colnames(coexpdata) = c('x', 'y', 'category', 'size')
     coexpdata = coexpdata[complete.cases(coexpdata),]
     coexpplot = ggplot(coexpdata, aes(x, y, color=category)) +
-      geom_point(size=coexpdata$size) +
-      xlab(source) + ylab(target) + labs(colour=field)
-    if (!is.numeric(condition[0])) {
-      coexpplot = coexpplot + scale_color_brewer(palette="Set1")
-    }
+      geom_point(size=coexpdata$size, show.legend = show.legend) +
+      xlab(source) + ylab(target) + labs(colour = legend.title)
     if (!is.null(title)) {
       coexpplot = coexpplot + ggtitle(title)
     }
@@ -416,6 +449,105 @@ plot2DEdgeList = function(edge_indexes, osa, net, ematrix,
       done = TRUE
     }
   }
+}
+
+#' Plots a 2D scatterplot for a given pair of genes
+#'
+#' @param gene1
+#'   The name of the first gene in the pair.
+#' @param gene2
+#'   The name of the second gene in the pair.
+#' @param osa
+#'   The sample annotation matrix. One column must contain the header 'Sample'
+#'   and the remaining colums correspond to an annotation type.  The rows
+#'   of the anntation columns should contain the annotations.
+#' @param net
+#'   A network data frame containing the KINC-produced network.  The loadNetwork
+#'   function imports a dataframe in the correct format for this function.
+#' @param ematrix
+#'   The expression matrix.
+#' @param field
+#'   The field in the sample annotation matrix by which to split the points
+#'   into separate layers.
+#' @param title
+#'   A title to give the plot. Default = NULL
+#' @export
+plot2DPair = function(gene1, gene2, osa, net, ematrix,
+                      field = NA, title = NA, show.legend=TRUE) {
+
+    x = t(ematrix[gene1,])
+    y = t(ematrix[gene2,])
+    condition = osa[,field]
+    size = 1
+    coexpdata = data.frame(source = x, target = y, category = condition, size = size)
+    colnames(coexpdata) = c('x', 'y', 'category', 'size')
+    coexpdata = coexpdata[complete.cases(coexpdata),]
+    coexpplot = ggplot(coexpdata, aes(x, y, color=category)) +
+      geom_point(size=coexpdata$size, show.legend = show.legend) +
+      xlab(gene1) + ylab(gene2) + labs(colour=field)
+    if (!is.null(title)) {
+      coexpplot = coexpplot + ggtitle(title)
+    }
+    print(coexpplot)
+    r = cor(coexpdata$x, coexpdata$y, method="spearman", use="complete.obs")
+    print(r)
+    return(coexpplot)
+}
+#' Plots four images for a given gene pair to explore their relationship.
+#'
+#' @param gene1
+#'   The name of the first gene in the pair.
+#' @param gene2
+#'   The name of the second gene in the pair.
+#' @param osa
+#'   The sample annotation matrix. One column must contain the header 'Sample'
+#'   and the remaining colums correspond to an annotation type.  The rows
+#'   of the anntation columns should contain the annotations.
+#' @param net
+#'   A network data frame containing the KINC-produced network.  The loadNetwork
+#'   function imports a dataframe in the correct format for this function.
+#' @param ematrix
+#'   The expression matrix.
+#' @param field
+#'   The field in the sample annotation matrix by which to split the points
+#'   into separate layers in the pairwise scatterplot
+#' @param field2
+#'   The field in the sample annotation matrix by which to order points on
+#'   the y-axis of the bottom two gene expression plots. The x-axis is
+#'   ordered by expression level.
+#' @param field3
+#'   The field in the sample annotation matrix by which the violin plots
+#'   should be organized.
+#' @export
+plot2DPairReport <-function(gene1, gene2, osa, net, ematrix,
+                            field = NA, field2 = field, field3 = field,
+                            show.legend=TRUE) {
+
+  FigYa = plot2DPair(gene1, gene2, osa, net, ematrix, field, title='(a)', show.legend=TRUE)
+  FigYc = plotGene(gene1, ematrix, osa, field2, colfield=field, show.legend=TRUE, title='(c)')
+  FigYd = plotGene(gene2, ematrix, osa, field2, colfield=field, show.legend=TRUE, title='(d)')
+
+  condition = osa[c(field3, field3)]
+  expdata = merge(t(ematrix[c(gene1,gene2),]), condition, by="row.names")
+  cols = c('Sample', gene1, gene2, 'Condition')
+  colnames(expdata) = cols
+  expdata = expdata[, cols]
+  expdata = expdata[complete.cases(expdata),]
+  expdata = melt(expdata)
+  colnames(expdata) = c('Sample', 'Condition', 'Gene', 'Expression')
+  FigYb <- ggplot(arrange(expdata, Condition), aes(x=Condition, y=Expression, fill=Condition)) +
+    geom_violin(trim=FALSE, show.legend=FALSE) + ggtitle('(b)') +
+    geom_boxplot(width=0.1, show.legend=FALSE) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+    facet_grid(. ~ Gene)
+
+  layout <- matrix(seq(1,100), ncol = 10, nrow = 10)
+  grid.newpage()
+  pushViewport(viewport(layout = grid.layout(nrow(layout), ncol(layout))))
+  print(FigYa, vp = viewport(layout.pos.row = c(1:6), layout.pos.col = c(1:5)))
+  print(FigYb, vp = viewport(layout.pos.row = c(1:6), layout.pos.col = c(6:10)))
+  print(FigYc, vp = viewport(layout.pos.row = c(7:10), layout.pos.col = c(1:5)))
+  print(FigYd, vp = viewport(layout.pos.row = c(7:10), layout.pos.col = c(6:10)))
 }
 
 #' Finds Linked communities in the network.

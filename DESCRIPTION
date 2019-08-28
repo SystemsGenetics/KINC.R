@@ -14,5 +14,8 @@ Imports:
   rgl,
   linkcomm,
   Rmixmod,
-  bigmemory
+  pwr,
+  dplyr,
+  reshape2,
+  grid
  

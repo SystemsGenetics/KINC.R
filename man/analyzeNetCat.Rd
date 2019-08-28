@@ -39,6 +39,8 @@ to the cluster.}
 \item{correction.}{The method to apply for multiple testing correction. Valid values are identical
 to those available to the p.adjust function.  The default is to
 apply 'hochberg' correction.}
+
+\item{nthreads}{The number of threads (CPU cores/threads) used to analyze the network.}
 }
 \description{
 Performs significant testing of each edge in the network for a set of annotation categories.

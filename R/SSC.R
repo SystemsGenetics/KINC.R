@@ -18,6 +18,26 @@ getEdgeSamples <- function(i, net) {
   sample_indexes = which(edge_samples == 1)
   return (sample_indexes)
 }
+#' Converts an edge sample string into an array of indexes of samples NOT belonging to the cluseter.
+#'
+#' @param i
+#'   The index of the edge in the network
+#' @param net
+#'   A network dataframe containing the KINC-produced network.  The loadNetwork
+#'   function imports a dataframe in the correct format for this function.
+#' @return
+#'   An array of sample indexes that are NOT part of the cluster. Because these
+#'   indexes are derived from the edge sample string they indexes should
+#'   correspond to the order of samples in the expression matrix.
+#' @export
+getEdgeSamplesInverse <- function(i, net) {
+  # Convert the sample string to a numerical vector.
+  edge = net[i,]
+  sample_str = edge$Samples
+  edge_samples = as.numeric(strsplit(sample_str, "")[[1]])
+  sample_indexes = which(edge_samples == 0)
+  return (sample_indexes)
+}
 
 #' Converts and edge sample string into an array.
 #'
@@ -287,9 +307,6 @@ performClusterBinomialTest = function(category, field, i, net, osa, ematrix,
     p1.pval = p1$p.value
   }
 
-  # Test #1b
-  # Perform the same test as #1 but for each other category separately.
-
   # Test #2
   # successes = number of category samples in the cluster
   # failures = number of category samples out of the cluster
@@ -301,7 +318,7 @@ performClusterBinomialTest = function(category, field, i, net, osa, ematrix,
     p2.pval = p2$p.value
   }
 
-  # Return the maximum p-value
+  # Set the maximum p-value
   # TODO: perhaps we should employ a method of combining p-values rather
   # than just using the minimum.
   # https://academic.oup.com/bioinformatics/article/32/17/i430/2450768
@@ -312,7 +329,81 @@ performClusterBinomialTest = function(category, field, i, net, osa, ematrix,
     print(p2)
   }
 
+  # If all tests pass then return the highest binomial
+  # p-value.
   return(p.value)
+}
+
+#' Filters out edges whose clusters don't have signficant variance in both genes.
+#'
+#' @param net
+#'   A network dataframe containing the KINC-produced network.  The loadNetwork
+#'   function imports a dataframe in the correct format for this function.
+#' @param ematrix
+#'   The expression matrix data frame.
+#' @param progressBar
+#'   Set to FALSE to repress progress bar
+#' @export
+applyClusterVarianceThreshold <- function(net, ematrix, progressBar = TRUE) {
+
+  keep = rep(FALSE, nrow(net))
+
+  # Intialize the progress bar
+  if (progressBar){
+    pb = txtProgressBar(min = 0, max = nrow(net), style = 3)
+  }
+
+  for (i in 1:nrow(net)) {
+    cluster_samples = getEdgeSamples(i, net)
+    non_cluster_samples = getEdgeSamplesInverse(i,net)
+    #print(i)
+
+    if (progressBar){
+      setTxtProgressBar(pb, i)
+    }
+
+    # Let's perform a t-test to make sure that the
+    # cluster, if signficant for the category is really signficant in both
+    # genes, otherwise, it may be another colinear factor controlling
+    # formation of the cluster
+    if (length(non_cluster_samples) > 1) {
+
+      # Caculate the number of sample needed for a
+      # t-test to have sufficient power.
+      cexp = t(ematrix[net$Source[i], cluster_samples])
+      aexp = t(ematrix[net$Source[i], non_cluster_samples])
+      pwr = power.welch.t.test(n = NULL, delta = abs(mean(aexp)- mean(cexp)),
+                               sd1 = sd(aexp), sd2 = sd(cexp),
+                               sig.level = 1e-3, power = 0.8)
+
+      # Perfrom a t-test with the first gene between
+      # the cluster expression values and non cluster
+      # expression values. if the p-value is significant then make
+      # sure it has sufficient power
+      t1 = t.test(cexp, aexp)
+      if ((t1$p.value < 1e-3) & (min(length(cexp), length(aexp)) >= pwr$n)) {
+        keep[i] = TRUE
+      }
+
+      # Now test the target gene.
+      cexp = t(ematrix[net$Target[i], cluster_samples])
+      aexp = t(ematrix[net$Target[i], non_cluster_samples])
+      pwr = power.welch.t.test(n = NULL, delta = abs(mean(aexp)- mean(cexp)),
+                             sd1 = sd(aexp), sd2 = sd(cexp),
+                             sig.level = 1e-3, power = 0.8)
+      t2 = t.test(cexp, aexp)
+      if (t2$p.value < 1e-3 & min(length(cexp), length(aexp)) >= pwr$n) {
+        keep[i] = TRUE
+      }
+      else {
+        keep[i] = FALSE
+      }
+    }
+  }
+  if (progressBar){
+    close(pb)
+  }
+  return(net[which(keep == TRUE),])
 }
 
 #' Performs significant testing of a single edge in the network for a set of annotation categories.
@@ -406,6 +497,8 @@ analyzeEdgeCat = function(i, osa, net, ematrix, field, test = 'binomial',
 #'   The probability of success for the second binomial test. This value
 #'   indicates the percentage of category samples that must belong
 #'   to the cluster.
+#' @param nthreads
+#'   The number of threads (CPU cores/threads) used to analyze the network.
 #' @export
 #'
 analyzeNetCat = function(net, osa, ematrix, field, test = 'binomial',
@@ -419,31 +512,33 @@ analyzeNetCat = function(net, osa, ematrix, field, test = 'binomial',
     categories = c(category)
   }
 
-  # Add in new columns for each category.
-  net2 = net
-  for (label in categories) {
-    subname = paste(field, label, sep='_')
-    net2[subname] = NA
-  }
-
   # Intialize the progress bar
   if (progressBar){
-    pb <- txtProgressBar(min = 0, max = nrow(net), style = 3)
+    pb = txtProgressBar(min = 0, max = nrow(net), style = 3)
   }
 
   # Iterate through the rows of the network
   for (i in 1:nrow(net)) {
+
     if (progressBar){
       setTxtProgressBar(pb, i)
+    }
+
+    # Add in new columns for each category.
+    for (label in categories) {
+      subname = paste(field, label, sep='_')
+      net[i, subname] = NA
     }
 
     # Calculate the probability that this edge is a result of any specific
     # known experimental condition (i.e. category) for the given field.
     p.vals = analyzeEdgeCat(i, osa, net, ematrix, field, test = test,
                             category, t1_psucc, t2_psucc)
+
+    # Add the p-values into the edge.
     for (label in names(p.vals)) {
       subname = paste(field, label, sep='_')
-      net2[i, subname] = p.vals[label]
+      net[i, subname] = p.vals[label]
     }
   }
   if (progressBar){
@@ -456,11 +551,11 @@ analyzeNetCat = function(net, osa, ematrix, field, test = 'binomial',
   if (test == 'fishers') {
     for (category in categories) {
       subname = paste(field, category, sep='_')
-      net2[subname] = p.adjust(as.numeric(unlist(net2[subname])), method=correction)
+      net[subname] = p.adjust(as.numeric(unlist(net[subname])), method=correction)
     }
   }
 
-  return(net2);
+  return(net);
 }
 #' Performs linear regression of a quantitative traits against a single edge in the network.
 #'
@@ -493,8 +588,8 @@ analyzeEdgeQuant = function(i, osa, net, field, samples = c()) {
   }
 
   # Build the expression vectors using only the samples provided.
-  x = t(ematrix[source, edge_samples])
-  y = t(ematrix[target, edge_samples])
+  x = as.numeric(t(ematrix[source, edge_samples]))
+  y = as.numeric(t(ematrix[target, edge_samples]))
   z = as.numeric(as.factor(osa[edge_samples, field]))
 
   # If our z-dimension only has one value then there's no need to
@@ -508,12 +603,14 @@ analyzeEdgeQuant = function(i, osa, net, field, samples = c()) {
   }
 
   # Use linear regression to obtain a p-value for the association.
-  model = lm(y + x ~ z, data=data.frame(x=x, y=y, z=z))
+  model = lm(z ~ x + y, data=data.frame(x=x, y=y, z=z))
   s = summary(model)
   pval = NA
   roccm = NA
   if (dim(s$coefficients)[1] > 1) {
-    pval = s$coefficients[2,4]
+    # Choose the smallest p-value of the x and y slopes
+    pval = min(s$coefficients[2,4], s$coefficients[3,4])
+
     # Get the rate of change of the mean of y + x
     roccm = s$coefficients[2,1]
   }
@@ -548,24 +645,33 @@ analyzeEdgeQuant = function(i, osa, net, field, samples = c()) {
 analyzeNetQuant = function(net, osa, field, correction = 'hochberg',
                            samples = c(), progressBar = TRUE) {
 
-  # Add in new columns for each category.
-  net2 = net
-  net2[field] = NA
-  net2[paste(field, '_roccm', sep='')] = NA
-
-  if(progressBar){pb <- txtProgressBar(min = 0, max = nrow(net), style = 3)}
-  for (i in 1:nrow(net)) {
-    if (progressBar){setTxtProgressBar(pb, i)}
-    result = analyzeEdgeQuant(i, osa, net, field, samples)
-    net2[i, field] = result[['p']]
-    net2[i, paste(field, '_roccm', sep='')] = result[['roccm']]
+  # Intialize the progress bar
+  if (progressBar) {
+    pb <- txtProgressBar(min = 0, max = nrow(net), style = 3)
   }
-  if (progressBar){close(pb)}
+  for (i in 1:nrow(net)) {
+
+    if (progressBar) {
+      setTxtProgressBar(pb, i)
+    }
+
+    # Add in new columns for the category.
+    net[i, field] = NA
+    net[i, paste(field, '_roccm', sep='')] = NA
+
+    result = analyzeEdgeQuant(i, osa, net, field, samples)
+    net[i, field] = result[['p']]
+    net[i, paste(field, '_roccm', sep='')] = result[['roccm']]
+  }
+  if (progressBar){
+    close(pb)
+  }
+
 
   # Perform multiple testing correction on the p-values
-  net2[field] = p.adjust(as.numeric(unlist(net2[field])), method=correction)
+  #net[field] = p.adjust(as.numeric(unlist(net[field])), method=correction)
 
-  return(net2);
+  return(net);
 }
 
 analyzeNetDiffQuant = function(net, osa, field, model_samples = NA, test_samples,
