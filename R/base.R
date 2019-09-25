@@ -480,9 +480,21 @@ plot2DPair = function(gene1, gene2, osa, net, ematrix,
     y = t(ematrix[gene2,])
     condition = osa[,field]
     size = 1
+
     coexpdata = data.frame(source = x, target = y, category = condition, size = size)
     colnames(coexpdata) = c('x', 'y', 'category', 'size')
     coexpdata = coexpdata[complete.cases(coexpdata),]
+
+    # If we have an edge in the network for this pair then we'll change
+    # the size of the points to match
+    edge = which((net$Source == gene1 & net$Target == gene2) | (net$Source == gene2 & net$Target == gene1))
+    if (edge & 'Samples' %in% colnames(net)) {
+      print(paste("Network Edge #", edge, sep=""))
+      coexpdata$size = 0.25
+      samples = getEdgeSamples(edge, net)
+      coexpdata$size[which(row.names(coexpdata) %in% colnames(ematrix)[samples])] = 1
+    }
+
     coexpplot = ggplot(coexpdata, aes(x, y, color=category)) +
       geom_point(size=coexpdata$size, show.legend = show.legend) +
       xlab(gene1) + ylab(gene2) + labs(colour=field)
@@ -517,13 +529,9 @@ plot2DPair = function(gene1, gene2, osa, net, ematrix,
 #'   The field in the sample annotation matrix by which to order points on
 #'   the y-axis of the bottom two gene expression plots. The x-axis is
 #'   ordered by expression level.
-#' @param field3
-#'   The field in the sample annotation matrix by which the violin plots
-#'   should be organized.
 #' @export
 plot2DEdgeReport <- function(edge_indexes, osa, net, ematrix,
-                             field = NA, field2 = field, field3 = field,
-                             show.legend=TRUE) {
+                             field = NA, field2 = field, show.legend=TRUE) {
   j = 1
   done = FALSE;
   while (!done) {
@@ -531,7 +539,7 @@ plot2DEdgeReport <- function(edge_indexes, osa, net, ematrix,
     source = net[i, 'Source']
     target = net[i, 'Target']
 
-    plot2DPairReport(source, target, osa, net, ematrix, field, field2, field3, show.legend)
+    plot2DPairReport(source, target, osa, net, ematrix, field, field2, show.legend)
 
     if (length(edge_indexes) == 1) {
       return
@@ -576,27 +584,34 @@ plot2DEdgeReport <- function(edge_indexes, osa, net, ematrix,
 #'   The field in the sample annotation matrix by which to order points on
 #'   the y-axis of the bottom two gene expression plots. The x-axis is
 #'   ordered by expression level.
-#' @param field3
-#'   The field in the sample annotation matrix by which the violin plots
-#'   should be organized.
 #' @export
 plot2DPairReport <-function(gene1, gene2, osa, net, ematrix,
-                            field = NA, field2 = field, field3 = field,
-                            show.legend=TRUE) {
+                            field = NA, field2 = field, show.legend=TRUE) {
 
   FigYa = plot2DPair(gene1, gene2, osa, net, ematrix, field, title='(a)', show.legend=TRUE)
   FigYc = plotGene(gene1, ematrix, osa, field2, colfield=field, show.legend=TRUE, title='(c)')
   FigYd = plotGene(gene2, ematrix, osa, field2, colfield=field, show.legend=TRUE, title='(d)')
 
-  condition = osa[c(field3, field3)]
-  expdata = merge(t(ematrix[c(gene1,gene2),]), condition, by="row.names")
-  cols = c('Sample', gene1, gene2, 'Condition')
+  # If we have an edge in the network for this pair then we'll change
+  # the size of the points to match
+  groups = osa[c(field2, field2)]
+  edge = which((net$Source == gene1 & net$Target == gene2) | (net$Source == gene2 & net$Target == gene1))
+  if (edge & 'Samples' %in% colnames(net)) {
+    samples = getEdgeSamples(edge, net)
+    groups = rep('Out', length(colnames(ematrix)))
+    groups[samples] = "In"
+    groups = data.frame(groups)
+    row.names(groups) = colnames(ematrix)
+  }
+
+  expdata = merge(t(ematrix[c(gene1,gene2),]), groups, by="row.names")
+  cols = c('Sample', gene1, gene2, 'Edge')
   colnames(expdata) = cols
   expdata = expdata[, cols]
   expdata = expdata[complete.cases(expdata),]
   expdata = melt(expdata)
-  colnames(expdata) = c('Sample', 'Condition', 'Gene', 'Expression')
-  FigYb <- ggplot(arrange(expdata, Condition), aes(x=Condition, y=Expression, fill=Condition)) +
+  colnames(expdata) = c('Sample', 'Edge', 'Gene', 'Expression')
+  FigYb <- ggplot(arrange(expdata, Edge), aes(x=Edge, y=Expression, fill=Edge)) +
     geom_violin(trim=FALSE, show.legend=FALSE) + ggtitle('(b)') +
     geom_boxplot(width=0.1, show.legend=FALSE) +
     theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
