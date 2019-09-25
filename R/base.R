@@ -8,19 +8,19 @@
 #'
 #' @export
 loadKINCNetwork = function(network_file, KINC_version = '1.0') {
-  # Load in the KINC network file
-  colNames = c(
-    "Source", "Target", "sc", "Interaction", "Cluster",
-    "Num_Clusters", "Cluster_Samples", "Missing_Samples", "Cluster_Outliers",
-    "Pair_Outliers", "Too_Low", "Samples"
-  )
-  colClasses = c(
+  # Get the number of columns in the file
+  ncols = max(count.fields(network_file, sep = "\t"))
+
+  # KINC v3 always provides the first 12 columns in a specific order. Any
+  # remaining columns should be read in but let R determine the type.
+  colClasses = cbind(c(
     "character", "character", "numeric", "character", "numeric",
     "numeric", "numeric", "numeric", "numeric", "numeric", "numeric",
     "character"
-  )
+  ), rep(NA, ncols=12))
+
   net = read.table(network_file, header = TRUE,
-    sep="\t", colClasses=colClasses, col.names=colNames)
+    sep="\t", colClasses=colClasses)
   return (net)
 }
 
@@ -85,11 +85,12 @@ saveKINCNetwork = function(net, network_file) {
 #'   A data frame containing the annotations in the order of the samples.
 #'
 #' @export
-loadSampleAnnotations = function (annotation_file, sample_order_file) {
-  sample_annots = read.table(annotation_file, sep="\t", header=TRUE, row.names=NULL, quote="", fill=TRUE)
-  sample_order = read.table(sample_order_file, colClasses=c('character'),
-                            col.names=c('Sample'))
-  osa = merge(sample_order, sample_annots, by = "Sample", sort=FALSE)
+loadSampleAnnotations = function (annotation_file) {
+  # Read in the annotation file
+  osa = read.table(annotation_file, sep="\t", header=TRUE, row.names=NULL, quote="", fill=TRUE)
+  #sample_order = read.table(sample_order_file, colClasses=c('character'),
+  #                          col.names=c('Sample'))
+  #osa = merge(sample_order, sample_annots, by = "Sample", sort=FALSE)
   row.names(osa) = osa$Sample
 
   return(osa)
@@ -493,6 +494,66 @@ plot2DPair = function(gene1, gene2, osa, net, ematrix,
     print(r)
     return(coexpplot)
 }
+
+#' Plots four images for each edge to explore their relationship.
+#'
+#' @param gene1
+#'   The name of the first gene in the pair.
+#' @param gene2
+#'   The name of the second gene in the pair.
+#' @param osa
+#'   The sample annotation matrix. One column must contain the header 'Sample'
+#'   and the remaining colums correspond to an annotation type.  The rows
+#'   of the anntation columns should contain the annotations.
+#' @param net
+#'   A network data frame containing the KINC-produced network.  The loadNetwork
+#'   function imports a dataframe in the correct format for this function.
+#' @param ematrix
+#'   The expression matrix.
+#' @param field
+#'   The field in the sample annotation matrix by which to split the points
+#'   into separate layers in the pairwise scatterplot
+#' @param field2
+#'   The field in the sample annotation matrix by which to order points on
+#'   the y-axis of the bottom two gene expression plots. The x-axis is
+#'   ordered by expression level.
+#' @param field3
+#'   The field in the sample annotation matrix by which the violin plots
+#'   should be organized.
+#' @export
+plot2DEdgeReport <- function(edge_indexes, osa, net, ematrix,
+                             field = NA, field2 = field, field3 = field,
+                             show.legend=TRUE) {
+  j = 1
+  done = FALSE;
+  while (!done) {
+    i = edge_indexes[j]
+    source = net[i, 'Source']
+    target = net[i, 'Target']
+
+    plot2DPairReport(source, target, osa, net, ematrix, field, field2, field3, show.legend)
+
+    if (length(edge_indexes) == 1) {
+      return
+    }
+    # Use the key press to navigate through the images.
+    val = readline(prompt=paste("Edge: ", i, '. ', j, " of ", length(edge_indexes), ". Type control keys the [enter]. Keys: n > forward, b > backwards, q > quit.", sep=""))
+    if (val == 'n') {
+      if (j < length(edge_indexes)) {
+        j = j + 1;
+      }
+    }
+    if (val == 'b') {
+      if (j > 1) {
+        j = j - 1
+      }
+    }
+    if(val == 'q') {
+      done = TRUE
+    }
+  }
+}
+
 #' Plots four images for a given gene pair to explore their relationship.
 #'
 #' @param gene1
