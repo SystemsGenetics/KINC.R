@@ -4,7 +4,7 @@
 \alias{loadSampleAnnotations}
 \title{Imports sample annotations.}
 \usage{
-loadSampleAnnotations(annotation_file, sample_order_file)
+loadSampleAnnotations(annotation_file)
 }
 \arguments{
 \item{annotation_file}{The path to the file containing the annotations.}

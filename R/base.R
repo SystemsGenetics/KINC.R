@@ -13,18 +13,18 @@ loadKINCNetwork = function(network_file, KINC_version = '1.0') {
 
   # KINC v3 always provides the first 12 columns in a specific order. Any
   # remaining columns should be read in but let R determine the type.
-  colClasses = cbind(c(
+  colClasses = c(c(
     "character", "character", "numeric", "character", "numeric",
     "numeric", "numeric", "numeric", "numeric", "numeric", "numeric",
     "character"
-  ), rep(NA, ncols=12))
+  ), rep("numeric", ncols-12))
 
   net = read.table(network_file, header = TRUE,
     sep="\t", colClasses=colClasses)
   return (net)
 }
 
-#' Removes edges with insignificant powe
+#' Removes edges with insignificant power
 #'
 #' @param net
 #'   A network data frame containing the KINC-produced network.  The loadNetwork
@@ -64,7 +64,18 @@ applyDynamicPowerThreshold = function(net, sig.level=0.001, power=0.8) {
 #'
 #' @export
 saveKINCNetwork = function(net, network_file) {
-  write.table(net, file= network_file, sep = "\t", na="NA", quote=FALSE, row.names=FALSE, col.names=TRUE)
+
+  num_cols = dim(net)[2]
+  if (num_cols > 12) {
+    for (i in 13:num_cols) {
+      if (is.numeric(net[,i])) {
+        net[,i] = format(net[,i], digits=4, nsmall=1)
+      }
+    }
+  }
+  write.table(format(net, digits=4), file = network_file,
+              sep = "\t", na="", quote=FALSE,
+              row.names=FALSE, col.names=TRUE)
 }
 
 #' Imports sample annotations.
@@ -142,11 +153,11 @@ graphEdgeList = function(edge_indexes, net, sim_col = 'sc', osa = data.frame()) 
   }
 
   # Plot the graph.
-  l = layout_with_kk(g)
-  plot(g,
-       vertex.label.color="black", vertex.label.cex = vlc, vertex.size = vs,
+  l = layout_nicely(g)
+  plot(g, vertex.label.color="black", vertex.label.cex = vlc, vertex.size = vs,
        edge.color='black', vertex.color='cyan',
        layout = l)
+
 
   return(list(
     graph = g,
@@ -341,19 +352,36 @@ plot3DEdgeList = function(edge_indexes, osa, net, ematrix, field, label_field = 
 #'   The name of the field by which to order the points along the
 #'   x-axis.
 #' @param xlab
-#'   The label for the x-axis of the plot.
+#'   The label for the x-axis
+#' @param colfield
+#'   The field in the OSA that should be used to color the points. Each
+#'   category in the field recieves a unique color.
+#' @param show.legend
+#'   Set to TRUE to have a legend appear on the figure. Defaults to TRUE.
+#' @param title
+#'   The text to use for the title of the figure.
+#' @param highlight
+#'   A vector of sample indexes to highlight in the plot.
 #' @export
 plotGene = function(gene, ematrix, osa, field, xlab = field, colfield = field,
-                    show.legend=TRUE, title = NA) {
+                    show.legend=TRUE, title = NA, highlight=c()) {
+
   condition = osa[c(field, colfield)]
   expdata = merge(t(ematrix[gene,]), condition, by="row.names")
   colnames(expdata) = c('Sample', 'y', 'x', 'z')
-  expdata = expdata[complete.cases(expdata),]
+
+  expdata$size = 1
+  if (length(highlight) > 0) {
+    expdata$size = 0.25
+    sample_names = colnames(ematrix)[highlight]
+    expdata$size[which(expdata$Sample %in% sample_names)] = 1
+  }
 
   expplot = ggplot(expdata, aes(x, y, color=z)) +
-    geom_point(size=1, show.legend = show.legend) +
+    geom_point(size=expdata$size, show.legend = show.legend) +
     xlab(xlab) + ylab(gene) +
-    theme(legend.title = element_blank())
+    theme(legend.title = element_blank()) +
+    scale_color_brewer(palette="Dark2")
   if (!is.null(title)) {
     expplot = expplot + ggtitle(title)
   }
@@ -393,8 +421,8 @@ plot2DEdgeList = function(edge_indexes, osa, net, ematrix,
   done = FALSE;
   while (!done) {
     i = edge_indexes[j]
-    source = net[i, 'Source']
-    target = net[i, 'Target']
+    source = net$Source[i]
+    target = net$Target[i]
     sample_indexes = c()
     if ('Samples' %in% names(net)) {
       sample_indexes = getEdgeSamples(i, net)
@@ -476,11 +504,15 @@ plot2DEdgeList = function(edge_indexes, osa, net, ematrix,
 plot2DPair = function(gene1, gene2, osa, net, ematrix,
                       field = NA, title = NA, show.legend=TRUE) {
 
-    x = t(ematrix[gene1,])
-    y = t(ematrix[gene2,])
-    condition = osa[,field]
+    # Get the gene expression and order it by the osa sample names.
+    x = t(ematrix[gene1, ])
+    y = t(ematrix[gene2, ])
+
+    # Get the conditions of the field specified by the user.
+    condition = osa[colnames(ematrix),field]
     size = 1
 
+    # Build a datafame suitable for ggplot
     coexpdata = data.frame(source = x, target = y, category = condition, size = size)
     colnames(coexpdata) = c('x', 'y', 'category', 'size')
     coexpdata = coexpdata[complete.cases(coexpdata),]
@@ -497,7 +529,8 @@ plot2DPair = function(gene1, gene2, osa, net, ematrix,
 
     coexpplot = ggplot(coexpdata, aes(x, y, color=category)) +
       geom_point(size=coexpdata$size, show.legend = show.legend) +
-      xlab(gene1) + ylab(gene2) + labs(colour=field)
+      xlab(gene1) + ylab(gene2) + labs(colour=field) +
+      scale_color_brewer(palette="Dark2")
     if (!is.null(title)) {
       coexpplot = coexpplot + ggtitle(title)
     }
@@ -588,14 +621,11 @@ plot2DEdgeReport <- function(edge_indexes, osa, net, ematrix,
 plot2DPairReport <-function(gene1, gene2, osa, net, ematrix,
                             field = NA, field2 = field, show.legend=TRUE) {
 
-  FigYa = plot2DPair(gene1, gene2, osa, net, ematrix, field, title='(a)', show.legend=TRUE)
-  FigYc = plotGene(gene1, ematrix, osa, field2, colfield=field, show.legend=TRUE, title='(c)')
-  FigYd = plotGene(gene2, ematrix, osa, field2, colfield=field, show.legend=TRUE, title='(d)')
-
   # If we have an edge in the network for this pair then we'll change
   # the size of the points to match
   groups = osa[c(field2, field2)]
   edge = which((net$Source == gene1 & net$Target == gene2) | (net$Source == gene2 & net$Target == gene1))
+  samples=c()
   if (edge & 'Samples' %in% colnames(net)) {
     samples = getEdgeSamples(edge, net)
     groups = rep('Out', length(colnames(ematrix)))
@@ -604,16 +634,22 @@ plot2DPairReport <-function(gene1, gene2, osa, net, ematrix,
     row.names(groups) = colnames(ematrix)
   }
 
+  FigYa = plot2DPair(gene1, gene2, osa, net, ematrix, field, title='(a)', show.legend=TRUE)
+  FigYc = plotGene(gene1, ematrix, osa, field2, colfield=field, show.legend=TRUE, title='(c)', highlight=samples)
+  FigYd = plotGene(gene2, ematrix, osa, field2, colfield=field, show.legend=TRUE, title='(d)', highlight=samples)
+
+
+
   expdata = merge(t(ematrix[c(gene1,gene2),]), groups, by="row.names")
   cols = c('Sample', gene1, gene2, 'Edge')
   colnames(expdata) = cols
   expdata = expdata[, cols]
-  expdata = expdata[complete.cases(expdata),]
   expdata = melt(expdata)
   colnames(expdata) = c('Sample', 'Edge', 'Gene', 'Expression')
   FigYb <- ggplot(arrange(expdata, Edge), aes(x=Edge, y=Expression, fill=Edge)) +
     geom_violin(trim=FALSE, show.legend=FALSE) + ggtitle('(b)') +
     geom_boxplot(width=0.1, show.legend=FALSE) +
+    scale_fill_brewer(palette="Paired") +
     theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
     facet_grid(. ~ Gene)
 
