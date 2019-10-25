@@ -311,9 +311,9 @@ filterBiasedEdges <- function(net, ematrix, th = 1e-3, progressBar = TRUE) {
 
   # Intialize a vector that we'll use to indicate which rows to keep.
   keep = rep(FALSE, dim(net)[1])
-  net$SourceDiff = NA
-  net$TargetDiff = NA
-  net$MissingDiff = NA
+  # net$SourceDiff = NA
+  # net$TargetDiff = NA
+  # net$MissingDiff = NA
 
   # Intialize the progress bar
   if (progressBar){
@@ -362,12 +362,12 @@ filterBiasedEdges <- function(net, ematrix, th = 1e-3, progressBar = TRUE) {
       # Perform the Welch one-way ANOVA test on in/out of gene1
       source = data.frame(Position = position, Expression = g1)
       w1 = oneway.test(Expression ~ Position, data=source, var.equal=FALSE)
-      net$SourceDiff[i] = w1$p.value
+      # net$SourceDiff[i] = w1$p.value
 
       # Perform the Welch one-way ANOVA test on in/out of gene2
       target = data.frame(Position = position, Expression = g2)
       w2 = oneway.test(Expression ~ Position, data=target, var.equal=FALSE)
-      net$TargetDiff[i] = w2$p.value
+      # net$TargetDiff[i] = w2$p.value
 
       # If the welch one-way ANOVA threshold is not significant then that
       # means that the distributions cannot be determined to be different
@@ -396,7 +396,7 @@ filterBiasedEdges <- function(net, ematrix, th = 1e-3, progressBar = TRUE) {
       # We should not keep this edge.
       t = t.test(g1m, g2m, paired = TRUE, alternative = "two.sided")
       if (!is.na(t)) {
-        net$MissingDiff[i] = t$p.value
+        # net$MissingDiff[i] = t$p.value
         if (t$p.value < 0.05) {
            keep[i] = FALSE
         }
