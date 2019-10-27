@@ -358,17 +358,19 @@ plot3DEdgeList = function(edge_indexes, osa, net, ematrix, field, label_field = 
 #'   category in the field recieves a unique color.
 #' @param show.legend
 #'   Set to TRUE to have a legend appear on the figure. Defaults to TRUE.
-#' @param title
+#' @param fig_title
 #'   The text to use for the title of the figure.
 #' @param highlight
 #'   A vector of sample indexes to highlight in the plot.
 #' @export
 plotGene = function(gene, ematrix, osa, field, xlab = field, colfield = field,
-                    show.legend=TRUE, title = NA, highlight=c()) {
+                    show.legend=TRUE, fig_title = NA, highlight=c()) {
 
-  condition = osa[c(field, colfield)]
+  condition = data.frame(c = as.factor(osa[[field]]), c2 = as.factor(osa[[colfield]]))
+  row.names(condition) = row.names(osa)
   expdata = merge(t(ematrix[gene,]), condition, by="row.names")
   colnames(expdata) = c('Sample', 'y', 'x', 'z')
+  row.names(expdata) = make.names(row.names(expdata))
 
   expdata$size = 1
   if (length(highlight) > 0) {
@@ -382,8 +384,8 @@ plotGene = function(gene, ematrix, osa, field, xlab = field, colfield = field,
     xlab(xlab) + ylab(gene) +
     theme(legend.title = element_blank()) +
     scale_color_brewer(palette="Dark2")
-  if (!is.null(title)) {
-    expplot = expplot + ggtitle(title)
+  if (!is.null(fig_title)) {
+    expplot = expplot + ggtitle(fig_title)
   }
   print(expplot)
   return(expplot)
@@ -411,12 +413,12 @@ plotGene = function(gene, ematrix, osa, field, xlab = field, colfield = field,
 #' @param highlight
 #'   If set to TRUE, makes the samples belonging to the cluster that
 #'   underlies the edge larger in the plot. Default = TRUE.
-#' @param title
+#' @param fig_title
 #'   A title to give the plot. Default = NULL
 #' @export
 plot2DEdgeList = function(edge_indexes, osa, net, ematrix,
                           field = NA, samples = NA, highlight = TRUE,
-                          title = NULL, show.legend=TRUE, legend.title = field) {
+                          fig_title = NULL, show.legend=TRUE, legend.title = field) {
   j = 1
   done = FALSE;
   while (!done) {
@@ -454,8 +456,8 @@ plot2DEdgeList = function(edge_indexes, osa, net, ematrix,
     coexpplot = ggplot(coexpdata, aes(x, y, color=category)) +
       geom_point(size=coexpdata$size, show.legend = show.legend) +
       xlab(source) + ylab(target) + labs(colour = legend.title)
-    if (!is.null(title)) {
-      coexpplot = coexpplot + ggtitle(title)
+    if (!is.null(fig_title)) {
+      coexpplot = coexpplot + ggtitle(fig_title)
     }
     print(coexpplot)
 
@@ -498,18 +500,18 @@ plot2DEdgeList = function(edge_indexes, osa, net, ematrix,
 #' @param field
 #'   The field in the sample annotation matrix by which to split the points
 #'   into separate layers.
-#' @param title
+#' @param fig_title
 #'   A title to give the plot. Default = NULL
 #' @export
 plot2DPair = function(gene1, gene2, osa, net, ematrix,
-                      field = NA, title = NA, show.legend=TRUE) {
+                      field = NA, fig_title = NA, show.legend=TRUE) {
 
     # Get the gene expression and order it by the osa sample names.
     x = t(ematrix[gene1, ])
     y = t(ematrix[gene2, ])
 
     # Get the conditions of the field specified by the user.
-    condition = osa[colnames(ematrix),field]
+    condition = as.factor(osa[colnames(ematrix),field])
     size = 1
 
     # Build a datafame suitable for ggplot
@@ -527,12 +529,14 @@ plot2DPair = function(gene1, gene2, osa, net, ematrix,
       coexpdata$size[which(row.names(coexpdata) %in% colnames(ematrix)[samples])] = 1
     }
 
+    row.names(coexpdata) = make.names(row.names(coexpdata))
+
     coexpplot = ggplot(coexpdata, aes(x, y, color=category)) +
       geom_point(size=coexpdata$size, show.legend = show.legend) +
       xlab(gene1) + ylab(gene2) + labs(colour=field) +
       scale_color_brewer(palette="Dark2")
-    if (!is.null(title)) {
-      coexpplot = coexpplot + ggtitle(title)
+    if (!is.null(fig_title)) {
+      coexpplot = coexpplot + ggtitle(fig_title)
     }
     print(coexpplot)
     r = cor(coexpdata$x, coexpdata$y, method="spearman", use="complete.obs")
@@ -634,9 +638,9 @@ plot2DPairReport <-function(gene1, gene2, osa, net, ematrix,
     row.names(groups) = colnames(ematrix)
   }
 
-  FigYa = plot2DPair(gene1, gene2, osa, net, ematrix, field, title='(a)', show.legend=TRUE)
-  FigYc = plotGene(gene1, ematrix, osa, field2, colfield=field, show.legend=TRUE, title='(c)', highlight=samples)
-  FigYd = plotGene(gene2, ematrix, osa, field2, colfield=field, show.legend=TRUE, title='(d)', highlight=samples)
+  FigYa = plot2DPair(gene1, gene2, osa, net, ematrix, field, fig_title='(a)', show.legend=TRUE)
+  FigYc = plotGene(gene1, ematrix, osa, field2, colfield=field, show.legend=TRUE, fig_title='(c)', highlight=samples)
+  FigYd = plotGene(gene2, ematrix, osa, field2, colfield=field, show.legend=TRUE, fig_title='(d)', highlight=samples)
 
 
 

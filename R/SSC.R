@@ -338,8 +338,8 @@ filterBiasedEdges <- function(net, ematrix, th = 1e-3, progressBar = TRUE) {
     # in-cluster and out-cluster samples of each gene are the same.
     # TODO: we should do a power-analysis to see how many samples we must have
     # to do thie Welch ANOVA test. For now we'll leave it at 15.
-    if (length(non_cluster_samples) - length(missing_samples) >= 5 &
-        length(cluster_samples) >= 5) {
+    if (length(non_cluster_samples) - length(missing_samples) >= 10 &
+        length(cluster_samples) >= 10) {
 
       # Get the expression vectors of the samples not in the cluster
       # and remove outliers. We don't need to do this for the in-cluster
