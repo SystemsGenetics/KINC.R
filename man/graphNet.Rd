@@ -4,7 +4,7 @@
 \alias{graphNet}
 \title{Draws the graph of the entire network}
 \usage{
-graphNet(net, osa = data.frame(), sim_col = "sc")
+graphNet(net, osa = data.frame())
 }
 \arguments{
 \item{net}{A network data frame containing the KINC-produced network.  The loadNetwork

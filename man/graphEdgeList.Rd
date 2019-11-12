@@ -4,7 +4,7 @@
 \alias{graphEdgeList}
 \title{Draws the graph of a set of edges in the network}
 \usage{
-graphEdgeList(edge_indexes, net, sim_col = "sc", osa = data.frame())
+graphEdgeList(edge_indexes, net, osa = data.frame())
 }
 \arguments{
 \item{edge_indexes}{The index of the edges in the network that comprise the module.}

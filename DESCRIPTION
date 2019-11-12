@@ -3,7 +3,17 @@ Title: Provides additional functions for network files created using KINC.
 Version: 0.1.0
 Authors@R: person("Stephen", "Ficklin", email = "stephen.ficklin@wsu.edu", role = c("aut", "cre"))
 Description: What the package does (one paragraph).
-Depends: R (>= 3.2.0)
+Depends: R (>= 3.2.0),
+  ggplot2,
+  igraph,
+  linkcomm,
+  Rmixmod,
+  pwr,
+  dplyr,
+  reshape2,
+  grid,
+  qvalue
+biocViews: 
 License: GPL-2
 Encoding: UTF-8
 LazyData: true
@@ -11,10 +21,10 @@ RoxygenNote: 6.1.1
 Imports:
   ggplot2,
   igraph,
-  rgl,
   linkcomm,
   Rmixmod,
   pwr,
   dplyr,
   reshape2,
-  grid
+  grid,
+  qvalue

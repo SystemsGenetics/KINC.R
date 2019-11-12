@@ -5,8 +5,8 @@
 \title{Plots a 2D scatterplot for a given list of edges.}
 \usage{
 plot2DEdgeList(edge_indexes, osa, net, ematrix, field = NA,
-  samples = NA, highlight = TRUE, title = NULL, show.legend = TRUE,
-  legend.title = field)
+  samples = NA, highlight = TRUE, fig_title = NULL,
+  show.legend = TRUE, legend.title = field)
 }
 \arguments{
 \item{edge_indexes}{The index of the edge in the network data frame.}
@@ -29,7 +29,7 @@ If no value is provided then all samples with values are included.}
 \item{highlight}{If set to TRUE, makes the samples belonging to the cluster that
 underlies the edge larger in the plot. Default = TRUE.}
 
-\item{title}{A title to give the plot. Default = NULL}
+\item{fig_title}{A title to give the plot. Default = NULL}
 }
 \description{
 Plots a 2D scatterplot for a given list of edges.

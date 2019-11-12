@@ -15,8 +15,7 @@ loadKINCNetwork = function(network_file, KINC_version = '1.0') {
   # remaining columns should be read in but let R determine the type.
   colClasses = c(c(
     "character", "character", "numeric", "character", "numeric",
-    "numeric", "numeric", "numeric", "numeric", "numeric", "numeric",
-    "character"
+    "numeric", "character"
   ), rep("numeric", ncols-12))
 
   net = read.table(network_file, header = TRUE,
@@ -47,7 +46,7 @@ applyDynamicPowerThreshold = function(net, sig.level=0.001, power=0.8) {
     print(paste("Checking clusters of size", i, "..."))
     pwr = pwr.r.test(n=i, sig.level = sig.level, power = power)
     th = pwr$r
-    keep[which(net$Cluster_Samples == i & abs(net$sc) >= th)] = TRUE
+    keep[which(net$Cluster_Samples == i & abs(net$Similarity_Score) >= th)] = TRUE
   }
 
 
@@ -116,9 +115,9 @@ loadSampleAnnotations = function (annotation_file) {
 #'   and the remaining colums correspond to an annotation type.  The rows
 #'   of the anntation columns should contain the annotations.
 #' @export
-graphNet = function(net, osa = data.frame(), sim_col = 'sc') {
+graphNet = function(net, osa = data.frame()) {
   edge_indexes = c(1:length(net$Source));
-  g = graphEdgeList(edge_indexes, net, sim_col, osa)
+  g = graphEdgeList(edge_indexes, net, osa)
   return(g)
 }
 
@@ -135,10 +134,10 @@ graphNet = function(net, osa = data.frame(), sim_col = 'sc') {
 #'   of the anntation columns should contain the annotations.
 #'
 #' @export
-graphEdgeList = function(edge_indexes, net, sim_col = 'sc', osa = data.frame()) {
+graphEdgeList = function(edge_indexes, net, osa = data.frame()) {
 
   g = graph.edgelist(as.matrix(net[edge_indexes, c('Source', 'Target')]), directed = F)
-  E(g)$weight = abs(net[edge_indexes, sim_col])
+  E(g)$weight = abs(net[edge_indexes, 'Similarity_Score'])
 
   # Don't show node labels if we have too many nodes.
   vlc = 0.5
@@ -679,8 +678,6 @@ plot2DPairReport <-function(gene1, gene2, osa, net, ematrix,
 #' @param module_prefix
 #'   A prefix to add to the beginning of the module names. By deafult this is simply
 #'   the letter 'M'.
-#' @param sim_col
-#'   The column name in the network data frame for the similarity score. Default is 'sc',
 #' @param hcmethod
 #'   A character string naming the hierarchical clustering method to use. Can be one of
 #'   "ward.D", "single", "complete", "average", "mcquitty", "median", or "centroid".
@@ -693,10 +690,11 @@ plot2DPairReport <-function(gene1, gene2, osa, net, ematrix,
 #'   The linked communities object.
 #' @export
 #'
-findLinkedCommunities = function(net, file_prefix, module_prefix = 'M', sim_col = 'sc',
+findLinkedCommunities = function(net, file_prefix="net", module_prefix = 'M',
                                  hcmethod = 'complete', meta = TRUE, ignore_inverse = TRUE) {
   new_net = net
   new_net$Module = NA
+  sim_col = 'Similarity_Score'
 
   # If the user requested to ignore inverse correlation edges we'll take those out.
   if (ignore_inverse) {
@@ -771,7 +769,7 @@ findLinkedCommunities = function(net, file_prefix, module_prefix = 'M', sim_col 
 
   # Convert all of the arrays above into a data frame for printing the modules
   # list.
-  write.table(new_net, file=paste(file_prefix, "coexpnet.edges.lcm.txt", sep=".") ,sep="\t", row.names=FALSE, append=FALSE, quote=FALSE)
+  write.table(new_net, file=paste(file_prefix, "gcn.lcm.txt", sep=".") ,sep="\t", row.names=FALSE, append=FALSE, quote=FALSE)
 
   # Write out the node list
   node_list = data.frame(Node=c(as.character(new_net$Source), as.character(new_net$Target)), Cluster=c(new_net$Module, new_net$Module))

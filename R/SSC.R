@@ -408,5 +408,85 @@ filterBiasedEdges <- function(net, ematrix, th = 1e-3, progressBar = TRUE) {
     close(pb)
   }
 
+  qs = qvalue(net[[colname]], fdr.level = fdr.level, pi0 = 1)
+  newcol = sub('_pVal$', '_qVal', colname)
+  net[[newcol]] = qs$qvalues
+  sig[[newcol]] = qs$significant
+  colorder[length(colorder)+1] = newcol
+
   return(net[which(keep == TRUE), ])
 }
+
+#' Calculates QValues from Pvalues in the network file.
+#'
+#' @param net
+#'   The KINC v3 network data frame.
+#' @param fdr.level
+#'   A level at which to control the FDR. Must be in (0,1].
+#'
+#' @export
+#'
+filterNetFDR <- function(net, fdr.level = 0.001) {
+  colnames = colnames(net)
+  colorder = c()
+  sig = data.frame(index = 1:dim(net)[1])
+  for (colname in colnames) {
+    colorder[length(colorder)+1] = colname
+    # Is this a p-value column?
+    if (length(grep('_pVal$', c(colname), perl=TRUE)) == 1) {
+      qs = qvalue(net[[colname]], fdr.level = fdr.level, pi0 = 1)
+      newcol = sub('_pVal$', '_qVal', colname)
+      net[[newcol]] = qs$qvalues
+      sig[[newcol]] = qs$significant
+      colorder[length(colorder)+1] = newcol
+    }
+  }
+  return (net[which(apply(sig, 1, any)),colorder])
+}
+
+#' Filters a KINC v3 network data frame by p-value, q-value or r-squared value.
+#'
+#' Any edge where all applicable scores fail to pass the threshold will
+#' be excluded.  If any score meets the requirement within the edge then
+#' the edge is kept.
+#'
+#' @param net
+#'   The KINC v3 network data frame.
+#' @param p_th
+#'   The p-value threshold. Any p-value column with a value below will
+#'   result in the edge being retained.
+#' @param q_th
+#'   The q-value threshold. Any p-value column with a value below will
+#'   result in the edge being retained. Q-values are added to the
+#'   network data frame using the calculateNetQValues function.
+#' @param r_th
+#'   The p-value threshold. Any p-value column with a value below will
+#'   result in the edge being retained.
+#'
+#'@export
+filterInsignficantEdges <- function(net, p_th = NA, q_th = 1e-3, r_th = NA) {
+  colnames = colnames(net)
+  keep = rep(FALSE, dim(net)[1])
+  for (i in 1:dim(net)[1]) {
+    for (colname in colnames) {
+      # Is this a p-value column?
+      if (!is.na(p_th) &
+          length(grep('_pVal$', c(colname), perl=TRUE)) == 1 &
+          net[i,colname] <= p_th) {
+        keep[i] = TRUE
+      }
+      if (!is.na(q_th) &
+          length(grep('_qVal$', c(colname), perl=TRUE)) == 1 &
+          net[i,colname] <= q_th) {
+        keep[i] = TRUE
+      }
+      if (!is.na(r_th) &
+          length(grep('_RSqr$', c(colname), perl=TRUE)) == 1 &
+          net[i,colname] >= r_th) {
+        keep[i] = TRUE
+      }
+    }
+  }
+  return (net[which(keep==TRUE),])
+}
+

@@ -27,10 +27,9 @@ getPairGMMEdges = function(source, target, ematrix, minc = 30,
   method="spearman", th=0.5, plot=FALSE, iterations = 5) {
 
   # Build the edges data frame, we'll return this when the function completes.
-  edges = data.frame(Source = character(), Target = character(), sc = numeric(),
-                     Interaction = character(), Cluster = numeric(),
-                     Num_Clusters = numeric(), Cluster_Samples = numeric(), Missing_Samples = numeric(),
-                     Cluster_Outliers = numeric(), Pair_Outliers = numeric(), Too_Low = numeric(),
+  edges = data.frame(Source = character(), Target = character(), Similarity_Score = numeric(),
+                     Interaction = character(), Cluster_Index = numeric(),
+                     Cluster_Size = numeric(),
                      Samples = character(), stringsAsFactors = FALSE)
 
   # Get the source and target genes from the expression matrix
@@ -73,12 +72,10 @@ getPairGMMEdges = function(source, target, ematrix, minc = 30,
     S[which(S$type == 0)]$stype = 1
     sample_str = paste(S$stype, sep='', collapse='')
 
-    edge = data.frame(Source = source, Target = target, sc = 1, Interaction = 'co', Cluster = 1,
-                      Num_Clusters = 1, Cluster_Samples = length(X$x),
-                      Missing_Samples = length(which(S$stype == 9)),
-                      Cluster_Outliers = length(which(S$stype == 8)),
-                      Pair_Outliers = length(which(S$stype == 7)),
-                      Too_Low = 0, Samples = sample_str, stringsAsFactors=FALSE)
+    edge = data.frame(Source = source, Target = target, Similarity_Score = 1, Interaction = 'co',
+                      Cluster_Index = 1,
+                      Cluster_Size = length(X$x),
+                      Samples = sample_str, stringsAsFactors=FALSE)
     edges = rbind(edges, edge)
     return (edges)
   }
@@ -145,12 +142,9 @@ getPairGMMEdges = function(source, target, ematrix, minc = 30,
       sample_str = paste(sample_str, sep='', collapse='')
 
       # Create a new edge dataframe and merge it into our edges data frame.
-      edge = data.frame(Source = source, Target = target, sc = r, Interaction = 'co', Cluster = ci,
-                       Num_Clusters = best@nbCluster, Cluster_Samples = length(cx),
-                       Missing_Samples = length(which(S$stype == 9)),
-                       Cluster_Outliers = length(which(S$stype == 8)),
-                       Pair_Outliers = length(which(S$stype == 7)),
-                       Too_Low = 0, Samples = sample_str, stringsAsFactors=FALSE)
+      edge = data.frame(Source = source, Target = target, Similarity_Score = r, Interaction = 'co', Cluster = ci,
+                       Num_Clusters = best@nbCluster,
+                       Samples = sample_str, stringsAsFactors=FALSE)
       edges = rbind(edges, edge)
     }
   }

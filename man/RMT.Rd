@@ -4,8 +4,8 @@
 \alias{RMT}
 \title{Performs the RMT analysis on a gene similarity matrix.}
 \usage{
-RMT(net, simcol = "sc", start = 0.99, end = 0.75, step = -0.001,
-  min.eigens = 100, save.plot = FALSE)
+RMT(net, start = 0.99, end = 0.75, step = -0.001, min.eigens = 100,
+  save.plot = FALSE)
 }
 \arguments{
 \item{net}{A network dataframe containing the KINC-produced network.  The loadNetwork

@@ -43,7 +43,8 @@
 #' @export
 #' @examples
 #'
-RMT = function(net, simcol = 'sc', start = 0.99, end = 0.75, step = -0.001, min.eigens = 100, save.plot = FALSE) {
+RMT = function(net, start = 0.99, end = 0.75, step = -0.001, min.eigens = 100, save.plot = FALSE) {
+  simcol = 'Similarity_Score'
   for (k in seq(start, end, step)) {
     sig = net[net[[simcol]] > k | net[[simcol]] < -k,]
     names=unique(c(as.vector(unique(sig$Source)), as.vector(unique(sig$Target))))

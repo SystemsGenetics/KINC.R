@@ -5,8 +5,7 @@
 \title{Finds Linked communities in the network.}
 \usage{
 findLinkedCommunities(net, file_prefix, module_prefix = "M",
-  sim_col = "sc", hcmethod = "complete", meta = TRUE,
-  ignore_inverse = TRUE)
+  hcmethod = "complete", meta = TRUE, ignore_inverse = TRUE)
 }
 \arguments{
 \item{net}{A network data frame containing the KINC-produced network.  The loadNetwork
@@ -16,8 +15,6 @@ function imports a dataframe in the correct format for this function.}
 
 \item{module_prefix}{A prefix to add to the beginning of the module names. By deafult this is simply
 the letter 'M'.}
-
-\item{sim_col}{The column name in the network data frame for the similarity score. Default is 'sc',}
 
 \item{hcmethod}{A character string naming the hierarchical clustering method to use. Can be one of
 "ward.D", "single", "complete", "average", "mcquitty", "median", or "centroid".
