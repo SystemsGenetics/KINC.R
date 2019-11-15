@@ -16,7 +16,7 @@ loadKINCNetwork = function(network_file, KINC_version = '1.0') {
   colClasses = c(c(
     "character", "character", "numeric", "character", "numeric",
     "numeric", "character"
-  ), rep("numeric", ncols-12))
+  ), rep("numeric", ncols-7))
 
   net = read.table(network_file, header = TRUE,
     sep="\t", colClasses=colClasses)
