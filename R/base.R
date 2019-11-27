@@ -254,16 +254,16 @@ plot3DPair = function(i, j, osa, ematrix, field, colors = NA, samples = NA, high
 #' @param field
 #'   The field in the sample annotation matrix by which to split the points
 #'   into separate layers.
-#' @param colors
-#'   An array of colors per sample.
 #' @param samples
 #'   Limit the plot to only the samples indexes provided.
 #' @param highlight
 #'   If set to TRUE then the samples in the edge cluster are drawn larger than the
 #'   other samples in the plot.
 #' @export
-plot3DEdgeList = function(edge_indexes, osa, net, ematrix, field, label_field = field,
-                          colors = NA, samples = NA, highlight = TRUE) {
+plot3DEdgeList = function(edge_indexes, osa, net, ematrix, field, label_field = NA,
+                          samples = NA, highlight = TRUE) {
+
+
   rgl.open()
   rgl.bg(color = "white")
 
@@ -286,22 +286,56 @@ plot3DEdgeList = function(edge_indexes, osa, net, ematrix, field, label_field = 
     if (!is.na(samples)) {
       x = t(ematrix[source, samples])
       y = t(ematrix[target, samples])
-      z = as.factor(osa[[field]][samples])
-      colors = colors[samples]
+      z = osa[[field]][samples]
     }
     else {
       x = t(ematrix[source, ])
       y = t(ematrix[target, ])
-      z = as.factor(osa[, field])
+      z = osa[, field]
     }
 
-    size = rep(0.25, length(x))
+    size = rep(0.3, length(x))
     if (highlight & length(sample_indexes) > 0) {
-      size[sample_indexes] = 0.5
+      size[sample_indexes] = 0.75
+    }
+
+    # Build a color vector for the data.
+    zcolors = rep('blue', length(z))
+    if (class(z) != 'factor' & class(z) != 'numeric') {
+      z = as.factor(z)
+    }
+    if (class(z) == 'factor') {
+      if (nlevels(z) > 2 & nlevels(z) <= 8) {
+        colors = data.frame(colors = brewer.pal(nlevels(z), "Dark2"), zval = unique(z), stringsAsFactors=FALSE)
+        for (i in 1:length(z)) {
+          zcolors[i] = colors$colors[which(colors$zval == z[i])]
+        }
+      }
+      if (nlevels(z) > 8) {
+        colfunc <- colorRampPalette(c("darkblue", "cyan"))
+        colors = data.frame(colors = colfunc(length(unique(z))), zval = sort(unique(z)), stringsAsFactors=FALSE)
+        for (i in 1:length(z)) {
+          zcolors[i] = colors$colors[which(colors$zval == z[i])]
+        }
+      }
+      if (nlevels(z) == 2) {
+        colors = data.frame(colors = brewer.pal(3, "Dark2")[1:2], zval = unique(z), stringsAsFactors=FALSE)
+        for (i in 1:length(z)) {
+          zcolors[i] = colors$colors[which(colors$zval == z[i])]
+        }
+      }
+    }
+    if (class(z) == 'numeric') {
+      # Use a blue gradient
+      colfunc <- colorRampPalette(c("darkblue", "cyan"))
+      colors = data.frame(colors = colfunc(length(unique(z))), zval = sort(unique(z)), stringsAsFactors=FALSE)
+      for (i in 1:length(z)) {
+        zcolors[i] = colors$colors[which(colors$zval == z[i])]
+      }
     }
 
     main = paste(source, 'vs', target, 'Edge:', i)
-    plot3d(x, y, z, type = 's', main = main, size = size, col = colors, xlab=source, ylab=target, zlab=field, axes=FALSE)
+    plot3d(x, y, z, type = 's', main = main, size = size, col = zcolors, xlab=source, ylab=target, zlab=field, axes=FALSE)
     z_labels = unique(sort(as.factor(osa[[field]])))
     box3d()
     axis3d('x')
@@ -365,7 +399,7 @@ plot3DEdgeList = function(edge_indexes, osa, net, ematrix, field, label_field = 
 plotGene = function(gene, ematrix, osa, field, xlab = field, colfield = field,
                     show.legend=TRUE, fig_title = NA, highlight=c()) {
 
-  condition = data.frame(c = as.factor(osa[[field]]), c2 = as.factor(osa[[colfield]]))
+  condition = data.frame(c = osa[[field]], c2 = osa[[colfield]])
   row.names(condition) = row.names(osa)
   expdata = merge(t(ematrix[gene,]), condition, by="row.names")
   colnames(expdata) = c('Sample', 'y', 'x', 'z')
@@ -381,8 +415,10 @@ plotGene = function(gene, ematrix, osa, field, xlab = field, colfield = field,
   expplot = ggplot(expdata, aes(x, y, color=z)) +
     geom_point(size=expdata$size, show.legend = show.legend) +
     xlab(xlab) + ylab(gene) +
-    theme(legend.title = element_blank()) +
-    scale_color_brewer(palette="Dark2")
+    theme(legend.title = element_blank())
+  if (!is.numeric(expdata$z)) {
+    expplot = expplot + scale_color_brewer(palette="Dark2")
+  }
   if (!is.null(fig_title)) {
     expplot = expplot + ggtitle(fig_title)
   }
@@ -510,7 +546,7 @@ plot2DPair = function(gene1, gene2, osa, net, ematrix,
     y = t(ematrix[gene2, ])
 
     # Get the conditions of the field specified by the user.
-    condition = as.factor(osa[colnames(ematrix),field])
+    condition = osa[colnames(ematrix),field]
     size = 1
 
     # Build a datafame suitable for ggplot
@@ -532,8 +568,10 @@ plot2DPair = function(gene1, gene2, osa, net, ematrix,
 
     coexpplot = ggplot(coexpdata, aes(x, y, color=category)) +
       geom_point(size=coexpdata$size, show.legend = show.legend) +
-      xlab(gene1) + ylab(gene2) + labs(colour=field) +
-      scale_color_brewer(palette="Dark2")
+      xlab(gene1) + ylab(gene2) + labs(colour=field)
+    if (!is.numeric(coexpdata$category)) {
+      coexpplot = coexpplot + scale_color_brewer(palette="Dark2")
+    }
     if (!is.null(fig_title)) {
       coexpplot = coexpplot + ggtitle(fig_title)
     }

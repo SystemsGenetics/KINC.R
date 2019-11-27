@@ -390,12 +390,13 @@ filterBiasedEdges <- function(net, ematrix, th = 1e-3, progressBar = TRUE) {
       g2m[which(!is.na(g2m))] = 0
       g2m[which(is.na(g2m))] = 1
 
-      # Perform a paired t-test to see how similar the missingness is. If the
-      # p-value is signficant then that means the pattern of missing
-      # values is different and there may be bias.
-      # We should not keep this edge.
-      t = t.test(g1m, g2m, paired = TRUE, alternative = "two.sided")
-      if (!is.na(t)) {
+      # If the two vectors are identical then don't do the test.
+      if (sum(abs(g1m - g2m)) != 0) {
+        # Perform a paired t-test to see how similar the missingness is. If the
+        # p-value is signficant then that means the pattern of missing
+        # values is different and there may be bias.
+        # We should not keep this edge.
+        t = t.test(g1m, g2m, paired = TRUE, alternative = "two.sided")
         # net$MissingDiff[i] = t$p.value
         if (t$p.value < 0.05) {
            keep[i] = FALSE
@@ -408,11 +409,11 @@ filterBiasedEdges <- function(net, ematrix, th = 1e-3, progressBar = TRUE) {
     close(pb)
   }
 
-  qs = qvalue(net[[colname]], fdr.level = fdr.level, pi0 = 1)
-  newcol = sub('_pVal$', '_qVal', colname)
-  net[[newcol]] = qs$qvalues
-  sig[[newcol]] = qs$significant
-  colorder[length(colorder)+1] = newcol
+#  qs = qvalue(net[[colname]], fdr.level = fdr.level, pi0 = 1)
+#  newcol = sub('_pVal$', '_qVal', colname)
+#  net[[newcol]] = qs$qvalues
+#  sig[[newcol]] = qs$significant
+#  colorder[length(colorder)+1] = newcol
 
   return(net[which(keep == TRUE), ])
 }
