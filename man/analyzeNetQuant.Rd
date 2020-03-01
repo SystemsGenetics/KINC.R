@@ -4,8 +4,14 @@
 \alias{analyzeNetQuant}
 \title{Performs significance association for every edge in the network.}
 \usage{
-analyzeNetQuant(net, osa, field, correction = "hochberg",
-  samples = c(), progressBar = TRUE)
+analyzeNetQuant(
+  net,
+  osa,
+  field,
+  correction = "hochberg",
+  samples = c(),
+  progressBar = TRUE
+)
 }
 \arguments{
 \item{net}{A network data frame containing the KINC-produced network.  The loadNetwork

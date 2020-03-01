@@ -7,20 +7,179 @@
 #'    A dataframe containing the network file contents
 #'
 #' @export
-loadKINCNetwork = function(network_file, KINC_version = '1.0') {
-  # Get the number of columns in the file
-  ncols = max(count.fields(network_file, sep = "\t"))
+loadKINCNetwork = function(network_file, type = 'full') {
+  if (type == 'full') {
+    # Get the number of columns in the file
+    ncols = max(count.fields(network_file, sep = "\t"))
 
-  # KINC v3 always provides the first 12 columns in a specific order. Any
-  # remaining columns should be read in but let R determine the type.
-  colClasses = c(c(
-    "character", "character", "numeric", "character", "numeric",
-    "numeric", "character"
-  ), rep("numeric", ncols-7))
+    # KINC v3 always provides the first 12 columns in a specific order. Any
+    # remaining columns should be read in but let R determine the type.
+    colClasses = c(c(
+      "character", "character", "numeric", "character", "numeric",
+      "numeric", "character"
+    ), rep("numeric", ncols-7))
 
-  net = read.table(network_file, header = TRUE,
-    sep="\t", colClasses=colClasses)
+    net = read.table(network_file, header = TRUE, sep="\t", colClasses=colClasses)
+  }
+  if (type == 'tidy') {
+    # KINC v3 always provides the first 12 columns in a specific order. Any
+    # remaining columns should be read in but let R determine the type.
+    colClasses = c(
+      "character", "character", "numeric", "character", "numeric",
+      "numeric", "character", "character", "numeric", "numeric")
+    net = read.table(network_file, header = TRUE, sep="\t", colClasses=colClasses)
+  }
   return (net)
+}
+
+#' Creates PNG figures describing p-value and r-squared distributions of the network.
+#'
+#' @param net
+#'   A network data frame containing the KINC-produced network.  The loadNetwork
+#'   function imports a dataframe in the correct format for this function.
+#' @param location
+#'   The full or relative path on the filesystem where images should be saved.
+#'   Default is "./figures".
+#' @param prefix
+#'   The prefix of the output images files.  It is recommended to use the same anem
+#'   as the output file.
+#' @param type
+#'   The type of network file. There are two supported types: "full" and "tidy".
+#'   Both of these formats are available on KINC v3.4.
+#'
+#' @return dataframe
+#'   A network dataframe with non-significant edges removed.
+#'
+#' @export
+saveKINCplots = function(net, location = "./figures", prefix = "KINC_network", type="full") {
+
+  # Make sure the figures directory exists.
+  if (!dir.exists(file.path(location))) {
+    dir.create(file.path(location), showWarnings = FALSE)
+  }
+
+  pdata = data.frame()
+  rdata = data.frame()
+
+  # If this is a full network then convert to tidy formats.
+  if (type == "full") {
+      # Create a data object of the p-value + simillarity column
+      pvalCols = names(net)[which(!is.na(str_extract(names(net), "_pVal")))]
+      pvalCols = append(pvalCols, 'Similarity_Score')
+      pvalCols = pvalCols[order(pvalCols)]
+      pdata = melt(net[,pvalCols], id.vars='Similarity_Score', value.name='p')
+      mround = function(x, base) {
+        base * floor(x/base)
+      }
+      pdata['Similarity_Score'] = as.factor(mround(abs(net[,'Similarity_Score']), 0.05))
+      pdata = pdata[which(pdata$p < 1e-3),]
+
+      # Create a data object of the r-squared + simillarity column
+      rsqrCols = names(net)[which(!is.na(str_extract(names(net), "_RSqr")))]
+      rsqrCols = append(rsqrCols, 'Similarity_Score')
+      rsqrCols = rsqrCols[order(rsqrCols)]
+      rdata = melt(net[,rsqrCols], id.vars='Similarity_Score', value.name='rsqr')
+      mround = function(x, base) {
+        base * floor(x/base)
+      }
+      rdata['Similarity_Score'] = as.factor(mround(abs(net[,'Similarity_Score']), 0.05))
+      rdata = rdata[which(rdata$r > 0.3),]
+  }
+
+  # Explore the distribution of p-values & rSqr for each trait
+  print(paste0("Saving: ", location, '/', prefix, '.pval_by_trait.png'))
+  png(paste0(location, '/', prefix, '.pval_by_trait.png'), width=6 ,height=6, units="in", res=300)
+  plot = ggplot(pdata, aes(x=variable, y=p, fill=variable)) +
+    geom_boxplot() +
+    scale_y_log10(breaks=c(1e-3, 1e-5, 1e-10, 1e-15, 1e-20)) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+    theme(legend.position = "none") +
+    xlab("") + ylab("p-value")
+  print(plot)
+  dev.off()
+
+  print(paste0("Saving: ", location, '/', prefix, '.rsqr_by_trait.png'))
+  png(paste0(location, '/', prefix, '.rsqr_by_trait.png'), width=6 ,height=6, units="in", res=300)
+  plot = ggplot(rdata, aes(x=variable, y=rsqr, fill=variable)) +
+    geom_boxplot() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+    theme(legend.position = "none") +
+    xlab("") + ylab("R^2")
+  print(plot)
+  dev.off()
+
+  # Explore the distribution of p-values per correlation range.
+  print(paste0("Saving: ", location, '/', prefix, '.pval_by_sim.png'))
+  png(paste0(location, '/', prefix, '.pval_by_sim.png'), width=6 ,height=6, units="in", res=300)
+  plot = ggplot(pdata, aes(x=Similarity_Score, y=p, fill=Similarity_Score)) +
+    geom_boxplot() +
+    scale_y_log10(breaks=c(1e-3, 1e-5, 1e-10, 1e-15, 1e-20)) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+    theme(legend.position = "none") +
+    xlab("Similarity Score") + ylab("p-value")
+  print(plot)
+  dev.off()
+
+  print(paste0("Saving: ", location, '/', prefix, '.rsqr_by_sim.png'))
+  png(paste0(location, '/', prefix, '.rsqr_by_sim.png'), width=6 ,height=6, units="in", res=300)
+  plot = ggplot(rdata, aes(x=Similarity_Score, y=rsqr, fill=Similarity_Score)) +
+    geom_boxplot() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+    theme(legend.position = "none") +
+    xlab("Similarity Score") + ylab("R^2")
+  print(plot)
+  dev.off()
+
+  # Explore the distribution of p-values per correlation range and trait.
+  print(paste0("Saving: ", location, '/', prefix, '.pval_by_simNtrait.png'))
+  png(paste0(location, '/', prefix, '.pval_by_simNtrait.png'), width=6 ,height=6, units="in", res=300)
+  plot = ggplot(pdata, aes(x=Similarity_Score, y=p, fill=variable)) +
+    geom_boxplot() +
+    facet_wrap(~variable) +
+    scale_y_log10(breaks=c(1e-3, 1e-5, 1e-10, 1e-15, 1e-20)) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+    theme(legend.position = "none") +
+    xlab("Similarity Score") + ylab("p-value")
+  print(plot)
+  dev.off()
+
+  print(paste0("Saving: ", location, '/', prefix, '.rsqr_by_simNtrait.png'))
+  png(paste0(location, '/', prefix, '.rsqr_by_simNtrait.png'), width=6 ,height=6, units="in", res=300)
+  plot = ggplot(rdata, aes(x=Similarity_Score, y=rsqr, fill=variable)) +
+    geom_boxplot() +
+    facet_wrap(~variable) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+    theme(legend.position = "none") +
+    xlab("Similarity Score") + ylab("R^2")
+  print(plot)
+  dev.off()
+
+  # How many rows does each trait contribute
+  print(paste0("Saving: ", location, '/', prefix, '.pval_hist.png'))
+  png(paste0(location, '/', prefix, '.pval_hist.png'), width=6 ,height=6, units="in", res=300)
+  plot = ggplot(pdata, aes(x=p, color=variable)) +
+    geom_histogram() +
+    facet_wrap(~variable) +
+    scale_x_log10(breaks=c(1e-3, 1e-5, 1e-10, 1e-15, 1e-20)) +
+    scale_y_log10() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+    theme(legend.position = "none") +
+    ylab("Count") + xlab("p-value")
+  print(plot)
+  dev.off()
+
+  print(paste0("Saving: ", location, '/', prefix, '.rsqr_hist.png'))
+  png(paste0(location, '/', prefix, '.rsqr_hist.png'), width=6 ,height=6, units="in", res=300)
+  plot = ggplot(rdata, aes(x=rsqr, color=variable)) +
+    geom_histogram() +
+    facet_wrap(~variable) +
+    scale_y_log10() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+    theme(legend.position = "none") +
+    ylab("Count") + xlab("R^2")
+  print(plot)
+  dev.off()
+
 }
 
 #' Removes edges with insignificant power
@@ -95,13 +254,13 @@ saveKINCNetwork = function(net, network_file) {
 #'   A data frame containing the annotations in the order of the samples.
 #'
 #' @export
-loadSampleAnnotations = function (annotation_file) {
+loadSampleAnnotations = function (annotation_file, sample_header="Sample") {
   # Read in the annotation file
   osa = read.table(annotation_file, sep="\t", header=TRUE, row.names=NULL, quote="", fill=TRUE)
   #sample_order = read.table(sample_order_file, colClasses=c('character'),
   #                          col.names=c('Sample'))
   #osa = merge(sample_order, sample_annots, by = "Sample", sort=FALSE)
-  row.names(osa) = osa$Sample
+  row.names(osa) = osa[,sample_header]
 
   return(osa)
 }

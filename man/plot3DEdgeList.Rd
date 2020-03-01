@@ -4,8 +4,16 @@
 \alias{plot3DEdgeList}
 \title{Plots a 3D scatterplot for a given list of edges.}
 \usage{
-plot3DEdgeList(edge_indexes, osa, net, ematrix, field,
-  label_field = field, colors = NA, samples = NA, highlight = TRUE)
+plot3DEdgeList(
+  edge_indexes,
+  osa,
+  net,
+  ematrix,
+  field,
+  label_field = NA,
+  samples = NA,
+  highlight = TRUE
+)
 }
 \arguments{
 \item{edge_indexes}{The index of the edge in the network data frame.}
@@ -21,8 +29,6 @@ function imports a dataframe in the correct format for this function.}
 
 \item{field}{The field in the sample annotation matrix by which to split the points
 into separate layers.}
-
-\item{colors}{An array of colors per sample.}
 
 \item{samples}{Limit the plot to only the samples indexes provided.}
 

@@ -4,8 +4,17 @@
 \alias{analyzeEdgeCat}
 \title{Performs significant testing of a single edge in the network for a set of annotation categories.}
 \usage{
-analyzeEdgeCat(i, osa, net, ematrix, field, test = "binomial",
-  category = NA, t1_psucc = 0.25, t2_psucc = 0.75)
+analyzeEdgeCat(
+  i,
+  osa,
+  net,
+  ematrix,
+  field,
+  test = "binomial",
+  category = NA,
+  t1_psucc = 0.25,
+  t2_psucc = 0.75
+)
 }
 \arguments{
 \item{i}{The index of the edge in the network}

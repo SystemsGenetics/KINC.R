@@ -4,9 +4,18 @@
 \alias{plot2DEdgeList}
 \title{Plots a 2D scatterplot for a given list of edges.}
 \usage{
-plot2DEdgeList(edge_indexes, osa, net, ematrix, field = NA,
-  samples = NA, highlight = TRUE, fig_title = NULL,
-  show.legend = TRUE, legend.title = field)
+plot2DEdgeList(
+  edge_indexes,
+  osa,
+  net,
+  ematrix,
+  field = NA,
+  samples = NA,
+  highlight = TRUE,
+  fig_title = NULL,
+  show.legend = TRUE,
+  legend.title = field
+)
 }
 \arguments{
 \item{edge_indexes}{The index of the edge in the network data frame.}

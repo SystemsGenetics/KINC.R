@@ -4,9 +4,18 @@
 \alias{analyzeNetCat}
 \title{Performs significant testing of each edge in the network for a set of annotation categories.}
 \usage{
-analyzeNetCat(net, osa, ematrix, field, test = "binomial",
-  correction = "hochberg", progressBar = TRUE, category = NA,
-  t1_psucc = 0.25, t2_psucc = 0.75)
+analyzeNetCat(
+  net,
+  osa,
+  ematrix,
+  field,
+  test = "binomial",
+  correction = "hochberg",
+  progressBar = TRUE,
+  category = NA,
+  t1_psucc = 0.25,
+  t2_psucc = 0.75
+)
 }
 \arguments{
 \item{net}{A network data frame containing the KINC-produced network.  The loadNetwork

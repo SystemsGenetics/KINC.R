@@ -4,8 +4,16 @@
 \alias{getPairGMMEdges}
 \title{Performs pair-wise Gaussian Mixture Models (GMM) on a pair of genes}
 \usage{
-getPairGMMEdges(source, target, ematrix, minc = 30,
-  method = "spearman", th = 0.5, plot = FALSE, iterations = 5)
+getPairGMMEdges(
+  source,
+  target,
+  ematrix,
+  minc = 30,
+  method = "spearman",
+  th = 0.5,
+  plot = FALSE,
+  iterations = 5
+)
 }
 \arguments{
 \item{source}{The name of the source gene.}
