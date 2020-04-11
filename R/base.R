@@ -32,6 +32,20 @@ loadKINCNetwork = function(network_file, type = 'full') {
   return (net)
 }
 
+#' Converts the KINC network dataframe to an iGraph object.
+#'
+#' @param net
+#'   A network data frame containing the KINC-produced network.  The loadNetwork
+#'   function imports a dataframe in the correct format for this function.
+#' @return
+#'   An iGraph object.
+#'
+#' @export
+KINCtoIgraph = function(net) {
+  g = graph.edgelist(as.matrix(net[, c('Source', 'Target')]), directed = FALSE)
+  return(g)
+}
+
 #' Creates PNG figures describing p-value and r-squared distributions of the network.
 #'
 #' @param net
@@ -73,17 +87,20 @@ saveKINCplots = function(net, location = "./figures", prefix = "KINC_network", t
       }
       pdata['Similarity_Score'] = as.factor(mround(abs(net[,'Similarity_Score']), 0.05))
       pdata = pdata[which(pdata$p < 1e-3),]
+      pdata$p = as.numeric(pdata$p)
 
       # Create a data object of the r-squared + simillarity column
       rsqrCols = names(net)[which(!is.na(str_extract(names(net), "_RSqr")))]
-      rsqrCols = append(rsqrCols, 'Similarity_Score')
-      rsqrCols = rsqrCols[order(rsqrCols)]
-      rdata = melt(net[,rsqrCols], id.vars='Similarity_Score', value.name='rsqr')
-      mround = function(x, base) {
-        base * floor(x/base)
+      if (length(rsqrCols) > 0) {
+        rsqrCols = append(rsqrCols, 'Similarity_Score')
+        rsqrCols = rsqrCols[order(rsqrCols)]
+        rdata = melt(net[,rsqrCols], id.vars='Similarity_Score', value.name='rsqr')
+        mround = function(x, base) {
+          base * floor(x/base)
+        }
+        rdata['Similarity_Score'] = as.factor(mround(abs(net[,'Similarity_Score']), 0.05))
+        rdata = rdata[which(rdata$r > 0.3),]
       }
-      rdata['Similarity_Score'] = as.factor(mround(abs(net[,'Similarity_Score']), 0.05))
-      rdata = rdata[which(rdata$r > 0.3),]
   }
 
   # Explore the distribution of p-values & rSqr for each trait
@@ -98,15 +115,17 @@ saveKINCplots = function(net, location = "./figures", prefix = "KINC_network", t
   print(plot)
   dev.off()
 
-  print(paste0("Saving: ", location, '/', prefix, '.rsqr_by_trait.png'))
-  png(paste0(location, '/', prefix, '.rsqr_by_trait.png'), width=6 ,height=6, units="in", res=300)
-  plot = ggplot(rdata, aes(x=variable, y=rsqr, fill=variable)) +
-    geom_boxplot() +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-    theme(legend.position = "none") +
-    xlab("") + ylab("R^2")
-  print(plot)
-  dev.off()
+  if (dim(rdata)[1] > 0) {
+    print(paste0("Saving: ", location, '/', prefix, '.rsqr_by_trait.png'))
+    png(paste0(location, '/', prefix, '.rsqr_by_trait.png'), width=6 ,height=6, units="in", res=300)
+    plot = ggplot(rdata, aes(x=variable, y=rsqr, fill=variable)) +
+      geom_boxplot() +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+      theme(legend.position = "none") +
+      xlab("") + ylab("R^2")
+    print(plot)
+    dev.off()
+  }
 
   # Explore the distribution of p-values per correlation range.
   print(paste0("Saving: ", location, '/', prefix, '.pval_by_sim.png'))
@@ -120,15 +139,17 @@ saveKINCplots = function(net, location = "./figures", prefix = "KINC_network", t
   print(plot)
   dev.off()
 
-  print(paste0("Saving: ", location, '/', prefix, '.rsqr_by_sim.png'))
-  png(paste0(location, '/', prefix, '.rsqr_by_sim.png'), width=6 ,height=6, units="in", res=300)
-  plot = ggplot(rdata, aes(x=Similarity_Score, y=rsqr, fill=Similarity_Score)) +
-    geom_boxplot() +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-    theme(legend.position = "none") +
-    xlab("Similarity Score") + ylab("R^2")
-  print(plot)
-  dev.off()
+  if (dim(rdata)[1] > 0) {
+    print(paste0("Saving: ", location, '/', prefix, '.rsqr_by_sim.png'))
+    png(paste0(location, '/', prefix, '.rsqr_by_sim.png'), width=6 ,height=6, units="in", res=300)
+    plot = ggplot(rdata, aes(x=Similarity_Score, y=rsqr, fill=Similarity_Score)) +
+      geom_boxplot() +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+      theme(legend.position = "none") +
+      xlab("Similarity Score") + ylab("R^2")
+    print(plot)
+    dev.off()
+  }
 
   # Explore the distribution of p-values per correlation range and trait.
   print(paste0("Saving: ", location, '/', prefix, '.pval_by_simNtrait.png'))
@@ -143,16 +164,18 @@ saveKINCplots = function(net, location = "./figures", prefix = "KINC_network", t
   print(plot)
   dev.off()
 
-  print(paste0("Saving: ", location, '/', prefix, '.rsqr_by_simNtrait.png'))
-  png(paste0(location, '/', prefix, '.rsqr_by_simNtrait.png'), width=6 ,height=6, units="in", res=300)
-  plot = ggplot(rdata, aes(x=Similarity_Score, y=rsqr, fill=variable)) +
-    geom_boxplot() +
-    facet_wrap(~variable) +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-    theme(legend.position = "none") +
-    xlab("Similarity Score") + ylab("R^2")
-  print(plot)
-  dev.off()
+  if (dim(rdata)[1] > 0) {
+    print(paste0("Saving: ", location, '/', prefix, '.rsqr_by_simNtrait.png'))
+    png(paste0(location, '/', prefix, '.rsqr_by_simNtrait.png'), width=6 ,height=6, units="in", res=300)
+    plot = ggplot(rdata, aes(x=Similarity_Score, y=rsqr, fill=variable)) +
+      geom_boxplot() +
+      facet_wrap(~variable) +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+      theme(legend.position = "none") +
+      xlab("Similarity Score") + ylab("R^2")
+    print(plot)
+    dev.off()
+  }
 
   # How many rows does each trait contribute
   print(paste0("Saving: ", location, '/', prefix, '.pval_hist.png'))
@@ -168,18 +191,19 @@ saveKINCplots = function(net, location = "./figures", prefix = "KINC_network", t
   print(plot)
   dev.off()
 
-  print(paste0("Saving: ", location, '/', prefix, '.rsqr_hist.png'))
-  png(paste0(location, '/', prefix, '.rsqr_hist.png'), width=6 ,height=6, units="in", res=300)
-  plot = ggplot(rdata, aes(x=rsqr, color=variable)) +
-    geom_histogram() +
-    facet_wrap(~variable) +
-    scale_y_log10() +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1))+
-    theme(legend.position = "none") +
-    ylab("Count") + xlab("R^2")
-  print(plot)
-  dev.off()
-
+  if (dim(rdata)[1] > 0) {
+    print(paste0("Saving: ", location, '/', prefix, '.rsqr_hist.png'))
+    png(paste0(location, '/', prefix, '.rsqr_hist.png'), width=6 ,height=6, units="in", res=300)
+    plot = ggplot(rdata, aes(x=rsqr, color=variable)) +
+      geom_histogram() +
+      facet_wrap(~variable) +
+      scale_y_log10() +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+      theme(legend.position = "none") +
+      ylab("Count") + xlab("R^2")
+    print(plot)
+    dev.off()
+  }
 }
 
 #' Removes edges with insignificant power

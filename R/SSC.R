@@ -134,6 +134,37 @@ getEdgeExpressionMatrix <- function(net, osa, ematrix) {
   colnames(sm) = cnames
   return(sm)
 }
+
+
+#' Calcualtes the distance matrix between edges.
+#'
+#' This function uses the dist function to calucate a distance
+#'
+#' @param net
+#'   A network data frame containing the KINC-produced network.  The loadNetwork
+#'   function imports a dataframe in the correct format for this function.
+#' @param distMethod
+#'   The method to be provided to the dist function.
+#' @param strict
+#'   If TRUE then all values in the netwrok sample string other than 1 are
+#'   converted to 0.  This means that numeric values indicating
+#'   missingness or removal as outliers are considered as 0.
+#'
+#' @return
+#'    returns an object of class "dist" from the dist function.
+#'
+#' @export
+getSampleDistance = function(net, distMethod = "manhattan", strict=TRUE) {
+
+  # Convert the samples strings into a matrix.
+  samples=getSampleMatrix(net, strict = strict)
+
+  # Calcualte the distance matrix.
+  sample_dist  = dist(samples, method = distMethod)
+
+  return(sample_dist)
+}
+
 #' Performs hierarchical clustering of edges in a network based on their sample compositions.
 #'
 #' This function uses the dist function to calucate a distance and the
@@ -146,29 +177,25 @@ getEdgeExpressionMatrix <- function(net, osa, ematrix) {
 #'   The method to be provided to the dist function.
 #' @param hclustMethod
 #'   The method to be provided to the hclust method.
-#'
+#' @param strict
+#'   If TRUE then all values in the netwrok sample string other than 1 are
+#'   converted to 0.  This means that numeric values indicating
+#'   missingness or removal as outliers are considered as 0.
 #' @return
 #'    An object of class hclust which describes the tree produced by the
 #'    clustering process.
 #'
-clusterEdges = function(net, distMethod = "manhattan", hclustMethod = "ward.D2") {
+#' @export
+clusterEdges = function(net, distMethod = "manhattan",
+                        hclustMethod = "ward.D2", strict=TRUE) {
 
-  # Convert the samples strings into a matrix.
-  num_samples = nchar(net$Samples[1])
-  sample_strs = net$Samples
-  samples = sapply(sample_strs, FUN=function(x) {
-    s = as.numeric(strsplit(x, "")[[1]])
-    s[which(s != 1)] = 0
-    return(s)
-  })
-  colnames(samples) = c()
-  samples=t(samples)
+  # Calcualte the distance matrix.
+  sample_dist  = getSampleDistance(net, distMethod, strict=strict)
 
-  # Perform clustering on the sample tree
-  sample_dist  = dist(samples, method = distMethod)
-  tree = hclust(sample_dist, method = hclustMethod)
+  # Perform clustering on the sample dendrogram tree
+  dendro = hclust(sample_dist, method = hclustMethod)
 
-  return(tree)
+  return(dendro)
 }
 
 #' Generates a matrix containing edge sample strings digits.
@@ -181,17 +208,26 @@ clusterEdges = function(net, distMethod = "manhattan", hclustMethod = "ward.D2")
 #' @param net
 #'   A network data frame containing the KINC-produced network.  The loadNetwork
 #'   function imports a dataframe in the correct format for this function.
+#'
+#' @param strict
+#'   If TRUE then all values in the netwrok sample string other than 1 are
+#'   converted to 0.  This means that numeric values indicating
+#'   missingness or removal as outliers are considered as 0.
 #' @return
-#'   A matrix
+#'   An n x m matrix where n is the number of edges and m is
+#'   the number of samples. The values are the numbers from
+#'   the sample strings in the network.
 #'
 #' @export
-getSampleMatrix = function(net) {
+getSampleMatrix = function(net, strict=TRUE) {
   # Convert the samples strings into a matrix.
   num_samples = nchar(net$Samples[1])
   sample_strs = net$Samples
   samples = sapply(sample_strs, FUN=function(x) {
     s = as.numeric(strsplit(x, "")[[1]])
-    s[which(s != 1)] = 0
+    if (strict) {
+      s[which(s != 1)] = 0
+    }
     return(s)
   })
   colnames(samples) = c()
@@ -210,15 +246,16 @@ getSampleMatrix = function(net) {
 #'   The sample annotation matrix as created by the loadSampleAnnotations()
 #'   function.
 #' @param fieldOrder
-#'   A vector containing a list of sample attribute names for reordering of
+#'   A vector containing a list of sample names for reordering of
 #'   of the samples. Each element of this vector should be the name of
 #'   a column in the osa matrix.  The sorting occurs first by the first
 #'   element, then by the second, etc.
-#' @param outfile_prefix
-#'   An output file prefix to add to the beginnging of the output heatmap image file.
-#'   If this argument is not provided then the figure will be plotted to the
-#'   default devide rather than to a file.
-drawEdgeTreeHeatMap = function(sampleMatrix, tree, osa, fieldOrder, outfile_prefix = NA) {
+#' @param image_name
+#'   The filename for saving the image. If no name is provided then
+#'   the image is not saved.
+#'
+#' @export
+drawEdgeTreeHeatMap = function(sampleMatrix, tree, osa, fieldOrder, image_name = NA) {
 
   # Reorder samples in the sampleMatrix according to the fieldOrder argument.
   sample_order = eval(parse(text=paste('order(osa$', paste(fieldOrder, collapse=' ,osa$'), ")", sep="")))
@@ -233,9 +270,8 @@ drawEdgeTreeHeatMap = function(sampleMatrix, tree, osa, fieldOrder, outfile_pref
   )
   colColors = as.character(merge(osa[sample_order,], tColors, by.x="hmap_categories", by.y="Field", sort=FALSE)$Color)
 
-  if (!is.na(outfile_prefix)) {
-    outfile = paste(outfile_prefix, paste(fieldOrder, collapse="-"), num_clusters, "png", sep=".")
-    png(filename = outfile, width=3000, height=21000, res=300)
+  if (!is.na(image_name)) {
+    png(filename = image_name, width=21000, height=3000, res=300)
   }
   heatmap.2(sampleMatrix2,
             Rowv=as.dendrogram(tree),
@@ -249,7 +285,7 @@ drawEdgeTreeHeatMap = function(sampleMatrix, tree, osa, fieldOrder, outfile_pref
             labRow = NULL,
             labCol = NULL
   )
-  if (!is.na(outfile_prefix)) {
+  if (!is.na(image_name)) {
     dev.off()
   }
 }
@@ -491,3 +527,110 @@ filterInsignficantEdges <- function(net, p_th = NA, q_th = 1e-3, r_th = NA) {
   return (net[which(keep==TRUE),])
 }
 
+#' Generates a matrix containing edge sample strings digits.
+#'
+#' The returned matrix contains as many rows as there are edges
+#' in the network and as many columns as their are samples. Each
+#' column corresponds to a sample in the same order as the
+#' sample strings from the network.
+#'
+#' @param net
+#'   A network data frame in Tidy format, containing the KINC-produced network.
+#'   The loadNetwork function imports a dataframe in the correct format for this function.
+#' @param osa
+#'   The sample annotation matrix as created by the loadSampleAnnotations()
+#'   function.
+#'
+#' @return
+#'   A list containing the following keys and values.
+#'   - modules: a matrix with the list of modules in order of the edges
+#'     present in the network provided by the net argument.
+#'   - sampleMatrix: the sample matrix used to caculate the similarity matrix
+#'     using the network sample strings.
+#'   - dendro: An object of class hclust which describes the tree produced by the
+#'     clustering process.
+#'   - scores: a data frame containing the scores representing the strength
+#'     of the association with the test names
+#'
+#' @export
+getSSLinkModules = function(net, osa, k=25, min_cluster_size = 10, show_plots = TRUE) {
+
+  # Set p-values at 0 to a very low value so our
+  # scoring works.
+  net[which(net$p_value == 0), 'p_value'] = 1e-100
+
+  # Create the dendrograms of sample strings in both strict and non-strict modes.
+  dendro = clusterEdges(net, strict=TRUE)
+  sampleMatrix = getSampleMatrix(net, strict=TRUE)
+
+  # Get the list of modules from the tree.
+  modules = cutree(dendro, k=k)
+
+  # Create a dataframe for storing the scores.
+  scores = data.frame(Module = as.character(), Size = as.numeric(),
+                      Test_Name = as.character(), Score = as.numeric())
+
+  # Create an empty array for storing the cluster membership.
+  membership = rep('', dim(net)[1])
+
+  # Iterate through the modules of the dendrogram.
+  for (m in unique(modules)) {
+
+    # Get the edges for this module and convert to iGraph object.
+    m_indexes = (which(modules == m))
+
+    mNet = netT[m_indexes,]
+    g = KINCtoIgraph(mNet)
+    g = set_edge_attr(g, 'Indexes', value=m_indexes)
+
+    # skip modules smaller than the min size.
+    min_verticies = 3
+    if (gorder(g) <= min_verticies) {
+      next
+    }
+
+    # Break the module into it's connected sub parts with
+    # sub modules no smaller than 3 edges.
+    subg = decompose(g,  min.vertices = min_verticies);
+
+    # Iterate through the sub graphs and calculate a score for how well
+    # overall represent the tests.
+    if (length(subg) == 0) {
+      subg[[1]] = g
+    }
+
+    for (gi in 1:length(subg)) {
+      indexes = edge_attr(subg[[gi]], 'Indexes')
+      size = length(indexes)
+      subnet = netT[indexes, ]
+
+      # Get some stats about the modules.
+      netByMod = subnet %>% group_by(Test_Name)
+      modScores = netByMod %>% summarise(p_value = mean(log10(p_value)) / log10(min(p_value)))
+      modScores = as.data.frame(modScores)
+      colnames(modScores) = c('Test_Name', 'Score')
+      mod_name = paste0('SSM', sprintf('%04d', m), 'C', sprintf('%03d', gi))
+      modScores['Module'] = mod_name
+      modScores['Size'] = size
+      if (size >= min_cluster_size) {
+        membership[indexes] = mod_name
+      }
+      scores = rbind(scores, modScores)
+    }
+  }
+
+  if (show_plots) {
+    par(mfrow=c(2,2))
+    hist(table(modules), xlab='Module Size', main=k)
+    plot(density(table(modules)))
+    boxplot(scores$Score, ylim=c(0,1), xlab="Score")
+    plot(scores$Score, scores$Size, xlim=c(0,1))
+  }
+
+  return(list(
+    'modules' = membership,
+    'sampleMatrix' = sampleMatrix,
+    'dendro' = dendro,
+    'scores' = scores
+  ))
+}

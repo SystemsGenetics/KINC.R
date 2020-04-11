@@ -13,7 +13,8 @@ Depends: R (>= 3.2.0),
   reshape2,
   grid,
   qvalue,
-  stringr
+  stringr,
+  gplots
 biocViews: 
 License: GPL-2
 Encoding: UTF-8
@@ -29,4 +30,5 @@ Imports:
   reshape2,
   grid,
   qvalue,
-  stringr
+  stringr,
+  gplots

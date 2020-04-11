@@ -4,14 +4,20 @@
 \alias{getSampleMatrix}
 \title{Generates a matrix containing edge sample strings digits.}
 \usage{
-getSampleMatrix(net)
+getSampleMatrix(net, strict = TRUE)
 }
 \arguments{
 \item{net}{A network data frame containing the KINC-produced network.  The loadNetwork
 function imports a dataframe in the correct format for this function.}
+
+\item{strict}{If TRUE then all values in the netwrok sample string other than 1 are
+converted to 0.  This means that numeric values indicating
+missingness or removal as outliers are considered as 0.}
 }
 \value{
-A matrix
+An n x m matrix where n is the number of edges and m is
+  the number of samples. The values are the numbers from
+  the sample strings in the network.
 }
 \description{
 The returned matrix contains as many rows as there are edges

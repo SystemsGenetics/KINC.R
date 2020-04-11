@@ -4,7 +4,12 @@
 \alias{clusterEdges}
 \title{Performs hierarchical clustering of edges in a network based on their sample compositions.}
 \usage{
-clusterEdges(net, distMethod = "manhattan", hclustMethod = "ward.D2")
+clusterEdges(
+  net,
+  distMethod = "manhattan",
+  hclustMethod = "ward.D2",
+  strict = TRUE
+)
 }
 \arguments{
 \item{net}{A network data frame containing the KINC-produced network.  The loadNetwork
@@ -13,6 +18,10 @@ function imports a dataframe in the correct format for this function.}
 \item{distMethod}{The method to be provided to the dist function.}
 
 \item{hclustMethod}{The method to be provided to the hclust method.}
+
+\item{strict}{If TRUE then all values in the netwrok sample string other than 1 are
+converted to 0.  This means that numeric values indicating
+missingness or removal as outliers are considered as 0.}
 }
 \value{
 An object of class hclust which describes the tree produced by the

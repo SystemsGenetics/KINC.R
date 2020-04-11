@@ -4,7 +4,7 @@
 \alias{drawEdgeTreeHeatMap}
 \title{Draws a heatmap with dendrogram with clusters identified.}
 \usage{
-drawEdgeTreeHeatMap(sampleMatrix, tree, osa, fieldOrder, outfile_prefix = NA)
+drawEdgeTreeHeatMap(sampleMatrix, tree, osa, fieldOrder, image_name = NA)
 }
 \arguments{
 \item{sampleMatrix}{The sample matrix as created by the getSampleMatrix() function.}
@@ -14,14 +14,13 @@ drawEdgeTreeHeatMap(sampleMatrix, tree, osa, fieldOrder, outfile_prefix = NA)
 \item{osa}{The sample annotation matrix as created by the loadSampleAnnotations()
 function.}
 
-\item{fieldOrder}{A vector containing a list of sample attribute names for reordering of
+\item{fieldOrder}{A vector containing a list of sample names for reordering of
 of the samples. Each element of this vector should be the name of
 a column in the osa matrix.  The sorting occurs first by the first
 element, then by the second, etc.}
 
-\item{outfile_prefix}{An output file prefix to add to the beginnging of the output heatmap image file.
-If this argument is not provided then the figure will be plotted to the
-default devide rather than to a file.}
+\item{image_name}{The filename for saving the image. If no name is provided then
+the image is not saved.}
 }
 \description{
 Draws a heatmap with dendrogram with clusters identified.
