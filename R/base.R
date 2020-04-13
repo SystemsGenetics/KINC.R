@@ -55,8 +55,7 @@ KINCtoIgraph = function(net) {
 #'   The full or relative path on the filesystem where images should be saved.
 #'   Default is "./figures".
 #' @param prefix
-#'   The prefix of the output images files.  It is recommended to use the same anem
-#'   as the output file.
+#'   The prefix of the output images files.
 #' @param type
 #'   The type of network file. There are two supported types: "full" and "tidy".
 #'   Both of these formats are available on KINC v3.4.
@@ -77,7 +76,7 @@ saveKINCplots = function(net, location = "./figures", prefix = "KINC_network", t
 
   # If this is a full network then convert to tidy formats.
   if (type == "full") {
-      # Create a data object of the p-value + simillarity column
+      # Create a data object of the p-value + similarity column
       pvalCols = names(net)[which(!is.na(str_extract(names(net), "_pVal")))]
       pvalCols = append(pvalCols, 'Similarity_Score')
       pvalCols = pvalCols[order(pvalCols)]
@@ -101,6 +100,14 @@ saveKINCplots = function(net, location = "./figures", prefix = "KINC_network", t
         rdata['Similarity_Score'] = as.factor(mround(abs(net[,'Similarity_Score']), 0.05))
         rdata = rdata[which(rdata$r > 0.3),]
       }
+  }
+  else {
+    pdata = net[c('Test_Name', 'p_value', 'Similarity_Score')]
+    pdata['Test_Name'] = sapply(pdata['Test_Name'], paste0, '_pVal')
+    colnames(pdata) = c('variable', 'p', 'Similarity_Score')
+    rdata = net[c('Test_Name', 'r_squared', 'Similarity_Score')]
+    rdata['Test_Name'] = sapply(rdata['Test_Name'], paste0, '_RSqr')
+    colnames(rdata) = c('variable', 'rsqr', 'Similarity_Score')
   }
 
   # Explore the distribution of p-values & rSqr for each trait

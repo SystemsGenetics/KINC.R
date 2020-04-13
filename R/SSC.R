@@ -316,14 +316,16 @@ drawEdgeListHeatMap = function(edge_indexes, osa, net, fieldOrder) {
 
 #' Removes edges after KINC has been run that are supsected to be biased.
 #'
-#' This function tests for two modes of bias: collinearity and missingness.  In
-#' either case, an edge can incorrectly appear to be signficantly associated
-#' with an experimental condition.
+#' This function tests for two modes of bias in the GMM cluster: lack of differntial
+#' expression and inconsistent missingness between the two genes of the edge.  In
+#' either case, an edge can incorrectly appear to be signficantly associated with an
+#' experimental condition.
 #'
-#' To correct for collinearity, a Welch one-way ANOVA test is performed for each
-#' gene. This tests if the distribution of the edge samples is different from the
-#' distribution of non-edge samples in both genes.  Collinearity can be detected
-#' when at least one of the gene shows no signficant difference between the two.
+#' To identify lack of differential expression, a Welch one-way ANOVA test is
+#' performed for each gene. This tests if the distribution of the edge samples is
+#' different from the distribution of non-edge samples in both genes.  Both genes
+#' must be differentially expressed for the edge samples from the non-edge samples
+#' to not be biased by one or the other.
 #'
 #' Missigness can bias an edge towards a condition if one gene that is highly
 #' condition-specific has missing values for samples that did not experience the
@@ -331,25 +333,39 @@ drawEdgeListHeatMap = function(edge_indexes, osa, net, fieldOrder) {
 #' analysis it must remove any samples that are missing in either gene.  To
 #' correct for this, a paired t-test is performed.
 #'
+#' This function returns a new network dataframe with only edges that passed
+#' the tests. It also adds three new columns to the input network that contains
+#' the p-values of the three tests: SourceWAnova, TargetWAnova, MissingTtest.
+#' These can be filtered later if needed.
+#'
 #' @param net
 #'   A network dataframe containing the KINC-produced network.  The loadNetwork
 #'   function imports a dataframe in the correct format for this function.
 #' @param ematrix
 #'   The expression matrix data frame.
-#' @param th
-#'   The signficance threshold for bias testing.  Edges with P-values below this
-#'   value, for any of the tests performed, are kept.
+#' @param wa_th
+#'   The signficance threshold for performing the Welch Anova test. This test
+#'   checks for differential expression of the GMM cluster vs non-cluster for each gene,
+#'   thus, two tests are performed: one for each gene in the edge.  Edges with both tests
+#'   having P-values below this value, are kept.
+#' @param mtt_th
+#'   The signficance threshold for performing the paired T-test for missingness. This test
+#'   checks for signicant difference in missingness between the two genes of an edge.
+#'   This is important because one gene with a high level of missginess will bias
+#'   the relationship if that missigness is condition-specific. Only edges whose
+#'   genes have the same pattern of missingness should be considered.  Those with
+#'   p-values greater than the threshold are considered non-different.
 #' @param progressBar
 #'   Set to FALSE to repress progress bar
 #'
 #' @export
-filterBiasedEdges <- function(net, ematrix, th = 1e-3, progressBar = TRUE) {
+filterBiasedEdges <- function(net, ematrix, wa_th = 1e-3, mtt_th = 0.1, progressBar = TRUE) {
 
   # Intialize a vector that we'll use to indicate which rows to keep.
   keep = rep(FALSE, dim(net)[1])
-  # net$SourceDiff = NA
-  # net$TargetDiff = NA
-  # net$MissingDiff = NA
+  net$SourceWAnova = NA
+  net$TargetWAnova = NA
+  net$MissingTtest = NA
 
   # Intialize the progress bar
   if (progressBar){
@@ -367,7 +383,7 @@ filterBiasedEdges <- function(net, ematrix, th = 1e-3, progressBar = TRUE) {
       setTxtProgressBar(pb, i)
     }
 
-    # First, performs a Welch's ANOVA test for both genes of every network edge.
+    # First, perform a Welch's ANOVA test for both genes of every network edge.
     # The Welch's Anova test is used for heteroscedastic data (non-equal variance)
     # and does not assume that both categories have the same distribution.  This
     # test is used for each edge of the network to test if the mean of the
@@ -398,17 +414,17 @@ filterBiasedEdges <- function(net, ematrix, th = 1e-3, progressBar = TRUE) {
       # Perform the Welch one-way ANOVA test on in/out of gene1
       source = data.frame(Position = position, Expression = g1)
       w1 = oneway.test(Expression ~ Position, data=source, var.equal=FALSE)
-      # net$SourceDiff[i] = w1$p.value
+      net$SourceWAnova[i] = w1$p.value
 
       # Perform the Welch one-way ANOVA test on in/out of gene2
       target = data.frame(Position = position, Expression = g2)
       w2 = oneway.test(Expression ~ Position, data=target, var.equal=FALSE)
-      # net$TargetDiff[i] = w2$p.value
+      net$TargetWAnova[i] = w2$p.value
 
       # If the welch one-way ANOVA threshold is not significant then that
       # means that the distributions cannot be determined to be different
       # and we should not keep this edge.
-      if (w1$p.value < th & w2$p.value < th) {
+      if (w1$p.value < wa_th & w2$p.value < wa_th) {
         keep[i] = TRUE
       }
     }
@@ -426,17 +442,20 @@ filterBiasedEdges <- function(net, ematrix, th = 1e-3, progressBar = TRUE) {
       g2m[which(!is.na(g2m))] = 0
       g2m[which(is.na(g2m))] = 1
 
-      # If the two vectors are identical then don't do the test.
+      # If the two vectors have identical missing then don't do the test.
       if (sum(abs(g1m - g2m)) != 0) {
         # Perform a paired t-test to see how similar the missingness is. If the
         # p-value is signficant then that means the pattern of missing
         # values is different and there may be bias.
         # We should not keep this edge.
         t = t.test(g1m, g2m, paired = TRUE, alternative = "two.sided")
-        # net$MissingDiff[i] = t$p.value
-        if (t$p.value < 0.05) {
+        net$MissingTtest[i] = t$p.value
+        if (t$p.value < mtt_th) {
            keep[i] = FALSE
         }
+      }
+      else {
+        net$MissingTtest[i] = 1
       }
     }
   }
