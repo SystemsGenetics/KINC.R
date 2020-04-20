@@ -5,8 +5,8 @@
 \title{Plots a 3D scatterplot for a given pair of nodes.}
 \usage{
 plot3DPair(
-  i,
-  j,
+  gene1,
+  gene2,
   osa,
   ematrix,
   field,
@@ -16,9 +16,9 @@ plot3DPair(
 )
 }
 \arguments{
-\item{i}{The index of the first node in the expression matrix.}
+\item{gene1}{The name of the first gene in the pair.}
 
-\item{j}{The index of the second node in the expression matrix.}
+\item{gene2}{The name of the second gene in the pair.}
 
 \item{osa}{The sample annotation matrix. One column must contain the header 'Sample'
 and the remaining colums correspond to an annotation type.  The rows

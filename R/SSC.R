@@ -12,9 +12,7 @@
 #' @export
 getEdgeSamples <- function(i, net) {
   # Convert the sample string to a numerical vector.
-  edge = net[i,]
-  sample_str = edge$Samples
-  edge_samples = as.numeric(strsplit(sample_str, "")[[1]])
+  edge_samples = as.numeric(strsplit(net[i, 'Samples'], "")[[1]])
   sample_indexes = which(edge_samples == 1)
   return (sample_indexes)
 }
@@ -33,9 +31,7 @@ getEdgeSamples <- function(i, net) {
 #' @export
 getNonEdgeSamples <- function(i, net) {
   # Convert the sample string to a numerical vector.
-  edge = net[i,]
-  sample_str = edge$Samples
-  edge_samples = as.numeric(strsplit(sample_str, "")[[1]])
+  edge_samples = as.numeric(strsplit(net[i, 'Samples'], "")[[1]])
   sample_indexes = which(edge_samples != 1)
   return (sample_indexes)
 }
@@ -58,9 +54,7 @@ getNonEdgeSamples <- function(i, net) {
 #'
 getMissingEdgeSamples <- function(i, net) {
   # Convert the sample string to a numerical vector.
-  edge = net[i,]
-  sample_str = edge$Samples
-  edge_samples = as.numeric(strsplit(sample_str, "")[[1]])
+  edge_samples = as.numeric(strsplit(net[i, 'Samples'], "")[[1]])
   sample_indexes = which(edge_samples == 9)
   return (sample_indexes)
 }
@@ -316,15 +310,15 @@ drawEdgeListHeatMap = function(edge_indexes, osa, net, fieldOrder) {
 
 #' Removes edges after KINC has been run that are supsected to be biased.
 #'
-#' This function tests for two modes of bias in the GMM cluster: lack of differntial
-#' expression and inconsistent missingness between the two genes of the edge.  In
-#' either case, an edge can incorrectly appear to be signficantly associated with an
-#' experimental condition.
+#' This function tests for two modes of bias in the GMM cluster: lack of differential
+#' cluster expression (DCE) and inconsistent missingness between the two genes of
+#' the edge.  In either case, an edge can incorrectly appear to be signficantly
+#' associated with an experimental condition.
 #'
-#' To identify lack of differential expression, a Welch one-way ANOVA test is
-#' performed for each gene. This tests if the distribution of the edge samples is
-#' different from the distribution of non-edge samples in both genes.  Both genes
-#' must be differentially expressed for the edge samples from the non-edge samples
+#' To identify lack of DCE, a Welch one-way ANOVA test is performed for each gene.
+#' This tests if the distribution of the edge samples is different from the
+#' distribution of non-edge samples in both genes.  Both genes must be
+#' differentially expressed for the edge samples from the non-edge samples
 #' to not be biased by one or the other.
 #'
 #' Missigness can bias an edge towards a condition if one gene that is highly
@@ -343,6 +337,9 @@ drawEdgeListHeatMap = function(edge_indexes, osa, net, fieldOrder) {
 #'   function imports a dataframe in the correct format for this function.
 #' @param ematrix
 #'   The expression matrix data frame.
+#' @param threads
+#'   The number of computational threads to use for parallel processing. By
+#'   default, all but 2 cores available on the local machine will be used.
 #' @param wa_th
 #'   The signficance threshold for performing the Welch Anova test. This test
 #'   checks for differential expression of the GMM cluster vs non-cluster for each gene,
@@ -355,122 +352,134 @@ drawEdgeListHeatMap = function(edge_indexes, osa, net, fieldOrder) {
 #'   the relationship if that missigness is condition-specific. Only edges whose
 #'   genes have the same pattern of missingness should be considered.  Those with
 #'   p-values greater than the threshold are considered non-different.
-#' @param progressBar
-#'   Set to FALSE to repress progress bar
 #'
 #' @export
-filterBiasedEdges <- function(net, ematrix, wa_th = 1e-3, mtt_th = 0.1, progressBar = TRUE) {
+filterBiasedEdges <- function(net, ematrix, threads=0, wa_th = 1e-3, mtt_th = 0.1) {
 
-  # Intialize a vector that we'll use to indicate which rows to keep.
-  keep = rep(FALSE, dim(net)[1])
-  net$SourceWAnova = NA
-  net$TargetWAnova = NA
-  net$MissingTtest = NA
-
-  # Intialize the progress bar
-  if (progressBar){
-    pb = txtProgressBar(min = 0, max = nrow(net), style = 3)
+  # Use all but two CPU cores. If there aren't more
+  # than 2 then just default to using 1.
+  if (threads == 0) {
+    ncores = detectCores()
+    threads = ncores - 2
+    if (threads < 1) {
+      threads = 1
+    }
   }
+  cl = makeCluster(threads)
 
-  for (i in 1:dim(net)[1]) {
-    gene1 = net$Source[i]
-    gene2 = net$Target[i]
-    cluster_samples = getEdgeSamples(i, net)
-    non_cluster_samples = getNonEdgeSamples(i,net)
-    missing_samples = getMissingEdgeSamples(i,net)
+  clusterExport(cl, c("ematrix", "performBiasTests", "getEdgeSamples", "getMissingEdgeSamples", "getNonEdgeSamples"))
+  results = pbapply(net, 1, performBiasTests, cl=cl)
+  stopCluster(cl)
 
-    if (progressBar){
-      setTxtProgressBar(pb, i)
-    }
+  results = as.data.frame(t(results), stringsAsFactors=FALSE)
 
-    # First, perform a Welch's ANOVA test for both genes of every network edge.
-    # The Welch's Anova test is used for heteroscedastic data (non-equal variance)
-    # and does not assume that both categories have the same distribution.  This
-    # test is used for each edge of the network to test if the mean of the
-    # in-cluster and out-cluster samples of each gene are the same.
-    # TODO: we should do a power-analysis to see how many samples we must have
-    # to do thie Welch ANOVA test. For now we'll leave it at 15.
-    if (length(non_cluster_samples) - length(missing_samples) >= 10 &
-        length(cluster_samples) >= 10) {
+  # Fix the network dataframe to have the correct types.
+  results$Similarity_Score = as.numeric(results$Similarity_Score)
+  results$Cluster_Index = as.numeric(results$Cluster_Index)
+  results$Cluster_Size = as.numeric(results$Cluster_Size)
+  results$SourceWAnova = as.numeric(results$SourceWAnova)
+  results$TargetWAnova = as.numeric(results$TargetWAnova)
+  results$MissingTtest = as.numeric(results$MissingTtest)
 
-      # Get the expression vectors of the samples not in the cluster
-      # and remove outliers. We don't need to do this for the in-cluster
-      # samples because clusters should be normal and have outliers removed
-      # by KINC.
-      ncs1 = as.vector(t(ematrix[gene1, non_cluster_samples]))
-      ncs2 = as.vector(t(ematrix[gene2, non_cluster_samples]))
-      b1 = boxplot(ncs1, plot = FALSE)
-      b2 = boxplot(ncs2, plot = FALSE)
-      # remove the outliers from the original expression data for the gene
-      g1 = as.vector(t(ematrix[gene1,]))
-      g2 = as.vector(t(ematrix[gene2,]))
-      g1[which(g1 %in% b1$out)] = NA
-      g2[which(g2 %in% b2$out)] = NA
-
-      # Create an array of which samples are in/out of the cluster
-      position = rep('Out',dim(ematrix)[2])
-      position[cluster_samples] = 'In'
-
-      # Perform the Welch one-way ANOVA test on in/out of gene1
-      source = data.frame(Position = position, Expression = g1)
-      w1 = oneway.test(Expression ~ Position, data=source, var.equal=FALSE)
-      net$SourceWAnova[i] = w1$p.value
-
-      # Perform the Welch one-way ANOVA test on in/out of gene2
-      target = data.frame(Position = position, Expression = g2)
-      w2 = oneway.test(Expression ~ Position, data=target, var.equal=FALSE)
-      net$TargetWAnova[i] = w2$p.value
-
-      # If the welch one-way ANOVA threshold is not significant then that
-      # means that the distributions cannot be determined to be different
-      # and we should not keep this edge.
-      if (w1$p.value < wa_th & w2$p.value < wa_th) {
-        keep[i] = TRUE
-      }
-    }
-
-    # If this looks like a good edge, let's do one more check to make
-    # sure there isn't bias in the missigness.
-    if (keep[i] == TRUE) {
-
-      # Convert the missigness of both genes to a feature where 1 == missing
-      # and 0 == not missing
-      g1m = as.vector(t(ematrix[gene1,]))
-      g1m[which(!is.na(g1m))] = 0
-      g1m[which(is.na(g1m))] = 1
-      g2m = as.vector(t(ematrix[gene2,]))
-      g2m[which(!is.na(g2m))] = 0
-      g2m[which(is.na(g2m))] = 1
-
-      # If the two vectors have identical missing then don't do the test.
-      if (sum(abs(g1m - g2m)) != 0) {
-        # Perform a paired t-test to see how similar the missingness is. If the
-        # p-value is signficant then that means the pattern of missing
-        # values is different and there may be bias.
-        # We should not keep this edge.
-        t = t.test(g1m, g2m, paired = TRUE, alternative = "two.sided")
-        net$MissingTtest[i] = t$p.value
-        if (t$p.value < mtt_th) {
-           keep[i] = FALSE
-        }
-      }
-      else {
-        net$MissingTtest[i] = 1
-      }
+  # Handle differences between tidy and not tidy networks.
+  if ('Test_Name' %in% colnames(net)) {
+    results$p_value = as.numeric(results$p_value)
+    results$r_squared = as.numeric(results$r_squared)
+  } else {
+    for (i in 8:dim(net)[2]) {
+      results[,i] = as.numeric(results[,i])
     }
   }
 
-  if (progressBar){
-    close(pb)
+  # Keep any edges that pass the filters or have an NA for each test.  The
+  # NA for a test indicates the test could not be run and therefore the
+  # edge could not be excluded.
+  keep = which((results$SourceWAnova <= wa_th | is.na(results$SourceWAnova)) &
+               (results$TargetWAnova <= wa_th | is.na(results$TargetWAnova)) &
+               (results$MissingTtest >= mtt_th | is.na(results$MissingTtest)))
+
+  return (net[keep,])
+}
+
+#' A helper function for the filterBiasedEdges.
+#'
+#' This function should not be called directly.
+#'
+#' @param row
+#'   The row from the network dataframe.
+#'
+#' @export
+performBiasTests <- function(row) {
+  gene1 = row['Source']
+  gene2 = row['Target']
+  row['SourceWAnova'] = NA
+  row['TargetWAnova'] = NA
+  row['MissingTtest'] = NA
+  cluster_samples = getEdgeSamples(1, t(as.data.frame(row)))
+  non_cluster_samples = getNonEdgeSamples(1, t(as.data.frame(row)))
+  missing_samples = getMissingEdgeSamples(1, t(as.data.frame(row)))
+
+  # First, perform a Welch's ANOVA test for both genes of every network edge.
+  # The Welch's Anova test is used for heteroscedastic data (non-equal variance)
+  # and does not assume that both categories have the same distribution.  This
+  # test is used for each edge of the network to test if the mean of the
+  # in-cluster and out-cluster samples of each gene are the same.
+
+  # Only perform the test if we have at least 10 samples in and
+  # out of the cluster.
+  if (length(non_cluster_samples) - length(missing_samples) >= 10 &
+      length(cluster_samples) >= 10) {
+
+    # Get the expression vectors of the samples not in the cluster
+    # and remove outliers. We don't need to do this for the in-cluster
+    # samples because clusters should be normal and have outliers removed
+    # by KINC.
+    ncs1 = as.vector(t(ematrix[gene1, non_cluster_samples]))
+    ncs2 = as.vector(t(ematrix[gene2, non_cluster_samples]))
+    b1 = boxplot(ncs1, plot = FALSE)
+    b2 = boxplot(ncs2, plot = FALSE)
+    # remove the outliers from the original expression data for the gene
+    g1 = as.vector(t(ematrix[gene1,]))
+    g2 = as.vector(t(ematrix[gene2,]))
+    g1[which(g1 %in% b1$out)] = NA
+    g2[which(g2 %in% b2$out)] = NA
+
+    # Create an array of which samples are in/out of the cluster
+    position = rep('Out',dim(ematrix)[2])
+    position[cluster_samples] = 'In'
+
+    # Perform the Welch one-way ANOVA test on in/out of gene1
+    source = data.frame(Position = position, Expression = g1)
+    w1 = oneway.test(Expression ~ Position, data=source, var.equal=FALSE)
+    row['SourceWAnova'] = w1$p.value
+
+    # Perform the Welch one-way ANOVA test on in/out of gene2
+    target = data.frame(Position = position, Expression = g2)
+    w2 = oneway.test(Expression ~ Position, data=target, var.equal=FALSE)
+    row['TargetWAnova'] = w2$p.value
   }
 
-#  qs = qvalue(net[[colname]], fdr.level = fdr.level, pi0 = 1)
-#  newcol = sub('_pVal$', '_qVal', colname)
-#  net[[newcol]] = qs$qvalues
-#  sig[[newcol]] = qs$significant
-#  colorder[length(colorder)+1] = newcol
+  # Let's do one more check to make sure there isn't bias in the missigness.
+  # Convert the missigness of both genes to a feature where 1 == missing
+  # and 0 == not missing
+  g1m = as.vector(t(ematrix[gene1,]))
+  g1m[which(!is.na(g1m))] = 0
+  g1m[which(is.na(g1m))] = 1
+  g2m = as.vector(t(ematrix[gene2,]))
+  g2m[which(!is.na(g2m))] = 0
+  g2m[which(is.na(g2m))] = 1
 
-  return(net[which(keep == TRUE), ])
+  # If the two vectors have identical missing then don't do the test.
+  if (sum(abs(g1m - g2m)) != 0) {
+    # Perform a paired t-test to see how similar the missingness is. If the
+    # p-value is signficant then that means the pattern of missing
+    # values is different and there may be bias.
+    # We should not keep this edge.
+    t = t.test(g1m, g2m, paired = TRUE, alternative = "two.sided")
+    row['MissingTtest'] = t$p.value
+  }
+
+  return(row)
 }
 
 #' Calculates QValues from Pvalues in the network file.

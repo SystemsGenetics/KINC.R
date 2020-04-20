@@ -462,3 +462,31 @@ analyzeEdgeDiffQuant = function(i, osa, net, field, model_samples = c(), test_sa
   res = (obs - exp[, 'lwr']) / (exp[, 'upr'] - exp[, 'lwr']) * 2 - 1
   return (res)
 }
+#' Removes edges with insignificant power
+#'
+#' @param net
+#'   A network data frame containing the KINC-produced network.  The loadNetwork
+#'   function imports a dataframe in the correct format for this function.
+#' @param sig.level
+#'   The signficance level (Type I error probability). Defaults to 0.01
+#' @param power
+#'   The power of the test (1 minuts Type II error probability)
+#'
+#' @return dataframe
+#'   A network dataframe with non-significant edges removed.
+#'
+applyDynamicPowerThreshold = function(net, sig.level=0.001, power=0.8) {
+
+  keep = rep(FALSE, nrow(net))
+  csizes = sort(unique(net$Cluster_Samples))
+
+  for (i in csizes) {
+    print(paste("Checking clusters of size", i, "..."))
+    pwr = pwr.r.test(n=i, sig.level = sig.level, power = power)
+    th = pwr$r
+    keep[which(net$Cluster_Samples == i & abs(net$Similarity_Score) >= th)] = TRUE
+  }
+
+
+  return(net[which(keep == TRUE),])
+}
