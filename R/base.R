@@ -82,6 +82,25 @@ loadKINCNetwork = function(network_file, nrows=-1, skip=0) {
   colnames(net) = colnames(headers)
   return (net)
 }
+
+#' Imports a network file produced by KINC into a data frame.
+#'
+#' @param GEM_file
+#'   The path to the GEM file on the file system. This file should
+#'   contain gene expression (or abundance data) where the rows
+#'   are genes (or compounds) and the columns are samples.  The first
+#'   column should countain the gene name.  The first row contain a
+#'   a header with only the sample names. Thus the header row has
+#'   one less values then every other row.
+#'
+#' @return
+#'    A dataframe containing the GEM.
+#'
+#' @export
+loadGEM = function(GEM_file) {
+  emx = read.table(GEM_file, header=TRUE, sep="\t")
+  return(emx)
+}
 #' Exports a network data frame as a KINC compatible file.
 #'
 #' @param net
@@ -684,10 +703,8 @@ getRanks = function(net) {
 #'
 #' @param annotation_file
 #'   The path to the file containing the annotations.
-#' @param smaple_order
-#'   A file containing the order of samples in the sample strings of
-#'   the network.  The file should contain the list of samples each on
-#'   a separate line.
+#' @param sample_header
+#'   The name of the column containing the sample names.
 #'
 #' @return
 #'   A data frame containing the annotations in the order of the samples.

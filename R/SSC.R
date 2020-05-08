@@ -565,9 +565,6 @@ filterInsignficantEdges <- function(net, p_th = NA, q_th = 1e-3, r_th = NA) {
 #' @param net
 #'   A network data frame in Tidy format, containing the KINC-produced network.
 #'   The loadNetwork function imports a dataframe in the correct format for this function.
-#' @param osa
-#'   The sample annotation matrix as created by the loadSampleAnnotations()
-#'   function.
 #'
 #' @return
 #'   A list containing the following keys and values.
@@ -581,7 +578,7 @@ filterInsignficantEdges <- function(net, p_th = NA, q_th = 1e-3, r_th = NA) {
 #'     of the association with the test names
 #'
 #' @export
-getSSLinkModules = function(net, osa, k=25, min_cluster_size = 10, show_plots = TRUE) {
+getSSLinkModules = function(net, k=25, min_cluster_size = 10, show_plots = TRUE) {
 
   # Set p-values at 0 to a very low value so our
   # scoring works.

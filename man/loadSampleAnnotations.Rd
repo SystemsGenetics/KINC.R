@@ -9,9 +9,7 @@ loadSampleAnnotations(annotation_file, sample_header = "Sample")
 \arguments{
 \item{annotation_file}{The path to the file containing the annotations.}
 
-\item{smaple_order}{A file containing the order of samples in the sample strings of
-the network.  The file should contain the list of samples each on
-a separate line.}
+\item{sample_header}{The name of the column containing the sample names.}
 }
 \value{
 A data frame containing the annotations in the order of the samples.
