@@ -8,7 +8,7 @@ The KINC.R package provides supplementary R functions to assist with analysis of
 
 ## Installation
 
-Clone this repository and start R in the cloned directory. The execute the following in the R command-line:
+Clone this repository and start R in the cloned directory. Then execute the following in the R command-line:
 ```
 library('devtools')
 install()
