@@ -1,3 +1,5 @@
+[![DOI](https://zenodo.org/badge/73464205.svg)](https://zenodo.org/badge/latestdoi/73464205)
+
 ![KINC logo](KINClogo.png)
 
 # KINC.R
