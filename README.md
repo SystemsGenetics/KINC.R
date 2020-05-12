@@ -8,13 +8,8 @@ The KINC.R package provides supplementary R functions to assist with analysis of
 
 ## Installation
 
-Clone this repository and start R in the cloned directory:
+Clone this repository and start R in the cloned directory. The execute the following in the R command-line:
 ```
 library('devtools')
 install()
-```
-
-Now you can use KINC.R in R by importing the library:
-```
-library('KINC.R')
 ```
