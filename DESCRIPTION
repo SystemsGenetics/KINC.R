@@ -1,6 +1,6 @@
 Package: KINC.R
 Title: Provides additional functions for network files created using KINC.
-Version: 0.1.0
+Version: 1.1
 Authors@R: person("Stephen", "Ficklin", email = "stephen.ficklin@wsu.edu", role = c("aut", "cre"))
 Description: What the package does (one paragraph).
 Depends: R (>= 3.2.0),
@@ -17,7 +17,8 @@ Depends: R (>= 3.2.0),
   gplots,
   parallel,
   pbapply,
-  R.utils
+  R.utils,
+  optparse
 biocViews: 
 License: GPL-2
 Encoding: UTF-8
@@ -37,5 +38,6 @@ Imports:
   gplots,
   parallel,
   pbapply,
-  R.utils
+  R.utils,
+  optparse
   
