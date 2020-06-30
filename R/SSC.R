@@ -659,3 +659,103 @@ getSSLinkModules = function(net, k=25, min_cluster_size = 10, show_plots = TRUE)
     'scores' = scores
   ))
 }
+
+#' A helper function for the filterPhasedEdges
+#'
+#' This function should not be called directly.
+#'
+#' @param row
+#'   The row from the network dataframe.
+#' @param test_column
+#'   The name of the column in the osa matrix that should be tested for
+#'   differential expression within the edge.
+#' @param sample_col
+#'   The name of the column in the osa matrix that contains the ssample name. The
+#'   default is 'Sample'
+#' @param min_cluster_size
+#'   The minimum size of the cluster for each label in the test_column.  The
+#'   default is 15.
+#' @export
+performHotellingTest = function(row, test_column, sample_col, min_cluster_size) {
+  source = row["Source"]
+  target = row["Target"]
+
+  esi = getEdgeSamples(1, t(as.data.frame(row)))
+  eamx = amx[esi,  c(sample_col, test_column)]
+  eemx = t(emx[c(source,target),][esi])
+
+  edata = merge(eamx,eemx,by="row.names")[,c(3,4,5)]
+  colnames(edata) = c('Label', 'Gene1', 'Gene2')
+
+  num_labels = table(edata$Label)
+  test_labels_i = which(num_labels > min_cluster_size)
+  if (length(test_labels_i) == 2) {
+    test_labels = row.names(num_labels)[test_labels_i]
+    edata = edata[which(edata$Label %in% test_labels),]
+    #fit = hotelling.test(.~Label ,edata, perm=TRUE, B=30, progBar=FALSE)
+    fit = hotelling.test(.~Label ,edata)
+    return(fit$pval)
+  }
+  return (NA)
+}
+
+#' This function identifies "phased" edges of a network.
+#'
+#' A phased edge is one in which another categorical column other than the one
+#' identified for the edge has differential expression within the GMM cluster
+#' underlying the edge but did not have sufficient 'uniqueness" within the
+#' cluster to identify a separate label-specific edge.
+#'
+#' This function currently only works when there are only two labels from the
+#' test_column of min_cluster_size or greater in the edge. If fewer or more
+#' are present then the edge is not tested.
+#'
+#' @param net
+#'   A network dataframe containing the KINC-produced network.  The loadNetwork
+#'   function imports a dataframe in the correct format for this function.
+#' @param ematrix
+#'   The expression matrix data frame as created by the loadGEM() function.
+#' @param osa
+#'   The sample annotation matrix as created by the loadSampleAnnotations()
+#'   function.
+#' @param test_column
+#'   The name of the column in the osa matrix that should be tested for
+#'   differential expression within the edge.
+#' @param sample_col
+#'   The name of the column in the osa matrix that contains the ssample name. The
+#'   default is 'Sample'
+#' @param min_cluster_size
+#'   The minimum size of the cluster for each label in the test_column.  The
+#'   default is 15.
+#' @param threads
+#'   The number of computational threads to use for parallel processing. By
+#'   default, all but 2 cores available on the local machine will be used.
+#'
+#' @return
+#'   The original network dataframes with an extra column added
+#'   containing the p-value of the test.
+#'
+#' @export
+performEdgeDiff = function(net, emx, amx, test_column, sample_col="Sample",
+                             min_cluster_size = 15, threads = 0 ) {
+
+  # Use all but two CPU cores. If there aren't more
+  # than 2 then just default to using 1.
+  if (threads == 0) {
+    ncores = detectCores()
+    threads = ncores - 2
+    if (threads < 1) {
+      threads = 1
+    }
+  }
+
+  cl = makeCluster(threads)
+  clusterExport(cl, c("net", "emx", "amx", "getEdgeSamples", "performHotellingTest", "hotelling.test"))
+  results = pbapply(net, 1, performHotellingTest,  test_column, sample_col, min_cluster_size, cl=cl)
+  stopCluster(cl)
+
+  net['hotelling_p_value'] = as.numeric(results)
+
+  return (net)
+
+}

@@ -661,7 +661,7 @@ getEdgeRanks = function(net, by_condition = TRUE, sscore_weight = 1, pval_weight
       net[which(net$Test_Name == condition), 'rank'] = csGCN$rank
     }
   }
-  return(net$rank)
+  return(as.numeric(net$rank))
 }
 
 #' A helper function for the getEdgeRanks
