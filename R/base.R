@@ -1364,13 +1364,19 @@ plot2DPairReport <-function(gene1, gene2, osa, net, ematrix,
 #' @param meta
 #'   Indicates if modules should be collapsed into meta-modules. If set to TRUE then
 #'   the linked communities returned are meta modules. Defaults to FALSE.
-#'
+#' @param th
+#'   A threshold for module merging. This parameter is used by `merge communities`. 
+#'   This is only used if `meta == TRUE`. Lower threshold results in merging
+#'   being more common.
+#' @param ignore_inverse
+#'   If TRUE inverese edges are removed from the analysis. Defaults to TRUE
+#'   
 #' @return
 #'   The linked communities object.
 #' @export
 #'
 findLinkedCommunities = function(net, file_prefix="net", module_prefix = 'M',
-                                 hcmethod = 'complete', meta = TRUE, ignore_inverse = TRUE) {
+                                 hcmethod = 'complete', meta = TRUE, th = 0.5, ignore_inverse = TRUE) {
   new_net = net
   new_net$Module = NA
   sim_col = 'Similarity_Score'
@@ -1411,7 +1417,7 @@ findLinkedCommunities = function(net, file_prefix="net", module_prefix = 'M',
     # heirarchical clustering method of LCM improperly merges some clusters that
     # are not connected.
     if (meta) {
-      r = mergeCommunities(lc)
+      r = mergeCommunities(lc, th)
     }
     else {
       r = list(
@@ -1476,24 +1482,28 @@ findLinkedCommunities = function(net, file_prefix="net", module_prefix = 'M',
 #'
 #' @param lc
 #'   A linkcomm object.
+#' @param th
+#'   Threshold to be used by `mergeClusters`. Lower threshold results in merging
+#'   being more common.
 #'
 #' @return
 #'   A list were each element of the list is the
 #'   set of nodes and edges of the merged clusters.
 
-mergeCommunities = function(lc){
+mergeCommunities = function(lc, th){
 
   cedges = lc$clusters
   cnodes = lc$nodeclusters
   cnodes$cluster = as.integer(cnodes$cluster)
-  r = mergeClusters(cedges, cnodes)
+  r = mergeClusters(cedges, cnodes, th)
 
   return(r)
 }
 
 #' The recursive merging function called by mergeCommunities().
-#'
-mergeClusters = function(cedges, cnodes, th = 0.5) {
+#' This is a helper function for the findLinkedCommunities() and mergeCommunities 
+#' functions and is not meant to be called on its own.
+mergeClusters = function(cedges, cnodes, th) {
   nclusters = length(cedges)
 
   # Create a dataframe for storing the best pairwise Jaccard similarity scores.
@@ -1533,7 +1543,7 @@ mergeClusters = function(cedges, cnodes, th = 0.5) {
     cnodes$cluster[which(cnodes$cluster == j)] = i
     cnodes$cluster[which(cnodes$cluster > j)] = cnodes$cluster[which(cnodes$cluster > j)] - 1
     cnodes = cnodes[which(!duplicated(cnodes)),]
-    r = mergeClusters(cedges, cnodes)
+    r = mergeClusters(cedges, cnodes, th)
     return(r)
   }
 
