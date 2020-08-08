@@ -10,7 +10,9 @@ findLinkedCommunities(
   module_prefix = "M",
   hcmethod = "complete",
   meta = TRUE,
-  ignore_inverse = TRUE
+  ignore_inverse = TRUE,
+  th = 0.5,
+  min.vertices = 10
 )
 }
 \arguments{
@@ -28,6 +30,16 @@ Defaults to "single".}
 
 \item{meta}{Indicates if modules should be collapsed into meta-modules. If set to TRUE then
 the linked communities returned are meta modules. Defaults to FALSE.}
+
+\item{ignore_inverse}{If TRUE inverese edges are removed from the analysis. Defaults to TRUE}
+
+\item{th}{Specifies the Jaccard similarity score between two modules gene content in order
+for those modules to be merged. Only applies if meta=TRUE. Lower threshold results in merging
+being more common.}
+
+\item{min.verticies}{If a network is disconnected then communities will be found in each subgraph
+independnet of the others. This argument specifies the number of elements that
+must exist in a subgraph for communities to be identified.}
 }
 \value{
 The linked communities object.

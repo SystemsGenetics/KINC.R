@@ -687,7 +687,7 @@ getRanks = function(net) {
   ordered_rsqr = unique_rsqr[order(unique_rsqr, decreasing=TRUE)]
   rsqr_ranks = data.frame(r_squared = ordered_rsqr, rsqr_rank = seq(1:length(ordered_rsqr)))
 
-  net = left_join(net ,score_ranks, by=c('ABS_Similarity_Score' = 'score'))
+  net = left_join(net, score_ranks, by=c('ABS_Similarity_Score' = 'score'))
   net = left_join(net, pval_ranks, by=c('p_value' = 'p_value'))
   net = left_join(net, rsqr_ranks, by=c('r_squared' = 'r_squared'))
 
@@ -1168,18 +1168,18 @@ plot2DEdgeList = function(edge_indexes, osa, net, ematrix,
 #'   The sample annotation matrix. One column must contain the header 'Sample'
 #'   and the remaining colums correspond to an annotation type.  The rows
 #'   of the anntation columns should contain the annotations.
+#' @param ematrix
+#'   The expression matrix.
 #' @param net
 #'   A network data frame containing the KINC-produced network.  The loadNetwork
 #'   function imports a dataframe in the correct format for this function.
-#' @param ematrix
-#'   The expression matrix.
 #' @param field
 #'   The field in the sample annotation matrix by which to split the points
 #'   into separate layers.
 #' @param fig_title
 #'   A title to give the plot. Default = NULL
 #' @export
-plot2DPair = function(gene1, gene2, osa, net, ematrix,
+plot2DPair = function(gene1, gene2, osa, ematrix, net = NA,
                       field = NA, fig_title = NA, show.legend=TRUE) {
 
     # Get the gene expression and order it by the osa sample names.
@@ -1197,12 +1197,15 @@ plot2DPair = function(gene1, gene2, osa, net, ematrix,
 
     # If we have an edge in the network for this pair then we'll change
     # the size of the points to match
-    edge = which((net$Source == gene1 & net$Target == gene2) | (net$Source == gene2 & net$Target == gene1))
-    if (edge & 'Samples' %in% colnames(net)) {
-      print(paste("Network Edge #", edge, sep=""))
-      coexpdata$size = 0.25
-      samples = getEdgeSamples(edge, net)
-      coexpdata$size[which(row.names(coexpdata) %in% colnames(ematrix)[samples])] = 1
+    if (!is.na(net)) {
+      edge = which((net$Source == gene1 & net$Target == gene2) | (net$Source == gene2 & net$Target == gene1))
+      if (length(edge) > 0 & 'Samples' %in% colnames(net)) {
+        print(paste("Network Edge #", edge, sep=""))
+        print(net[edge,])
+        coexpdata$size = 0.25
+        samples = getEdgeSamples(edge, net)
+        coexpdata$size[which(row.names(coexpdata) %in% colnames(ematrix)[samples])] = 1
+      }
     }
 
     row.names(coexpdata) = make.names(row.names(coexpdata))
@@ -1308,7 +1311,7 @@ plot2DPairReport <-function(gene1, gene2, osa, net, ematrix,
   groups = osa[c(field2, field2)]
   edge = which((net$Source == gene1 & net$Target == gene2) | (net$Source == gene2 & net$Target == gene1))
   samples=c()
-  if (edge & 'Samples' %in% colnames(net)) {
+  if (length(edge) > 0 & 'Samples' %in% colnames(net)) {
     samples = getEdgeSamples(edge, net)
     groups = rep('Out', length(colnames(ematrix)))
     groups[samples] = "In"
@@ -1316,7 +1319,7 @@ plot2DPairReport <-function(gene1, gene2, osa, net, ematrix,
     row.names(groups) = colnames(ematrix)
   }
 
-  FigYa = plot2DPair(gene1, gene2, osa, net, ematrix, field, fig_title='(a)', show.legend=TRUE)
+  FigYa = plot2DPair(gene1, gene2, osa, ematrix, net = net, field = field, fig_title='(a)', show.legend=TRUE)
   FigYc = plotGene(gene1, ematrix, osa, field2, colfield=field, show.legend=TRUE, fig_title='(c)', highlight=samples)
   FigYd = plotGene(gene2, ematrix, osa, field2, colfield=field, show.legend=TRUE, fig_title='(d)', highlight=samples)
 
@@ -1365,9 +1368,13 @@ plot2DPairReport <-function(gene1, gene2, osa, net, ematrix,
 #'   Indicates if modules should be collapsed into meta-modules. If set to TRUE then
 #'   the linked communities returned are meta modules. Defaults to FALSE.
 #' @param th
-#'   A threshold for module merging. This parameter is used by `merge communities`. 
-#'   This is only used if `meta == TRUE`. Lower threshold results in merging
+#'   Specifies the Jaccard similarity score between two modules gene content in order
+#'   for those modules to be merged. Only applies if meta=TRUE. Lower threshold results in merging
 #'   being more common.
+#' @param min.verticies
+#'   If a network is disconnected then communities will be found in each subgraph
+#'   independnet of the others. This argument specifies the number of elements that
+#'   must exist in a subgraph for communities to be identified.
 #' @param ignore_inverse
 #'   If TRUE inverese edges are removed from the analysis. Defaults to TRUE
 #'   
@@ -1376,7 +1383,8 @@ plot2DPairReport <-function(gene1, gene2, osa, net, ematrix,
 #' @export
 #'
 findLinkedCommunities = function(net, file_prefix="net", module_prefix = 'M',
-                                 hcmethod = 'complete', meta = TRUE, th = 0.5, ignore_inverse = TRUE) {
+                                 hcmethod = 'complete', meta = TRUE, 
+                                 ignore_inverse = TRUE, th=0.5, min.vertices=10) {
   new_net = net
   new_net$Module = NA
   sim_col = 'Similarity_Score'
@@ -1397,7 +1405,7 @@ findLinkedCommunities = function(net, file_prefix="net", module_prefix = 'M',
   # Linked community method doesn't do well with disconnected graphs. So, we want
   # to decompose the graph into its disjointed subgraphs.  If the callee doesn't want
   # modules to span inverse edges then remove those.
-  subg = decompose(g,  min.vertices = 30);
+  subg = decompose(g,  min.vertices = min.vertices);
 
   lcs = list()
 
@@ -1490,7 +1498,7 @@ findLinkedCommunities = function(net, file_prefix="net", module_prefix = 'M',
 #'   A list were each element of the list is the
 #'   set of nodes and edges of the merged clusters.
 
-mergeCommunities = function(lc, th){
+mergeCommunities = function(lc, th = 0.5){
 
   cedges = lc$clusters
   cnodes = lc$nodeclusters
@@ -1534,7 +1542,7 @@ mergeClusters = function(cedges, cnodes, th) {
 
   # Now merge the best two clusters as long as the jaccard score is above
   # our given threshold.
-  if (best$ji[1] > th) {
+  if (best$ji[1] >= th) {
     i = best$i[1]
     j = best$j[1]
     cat(paste("Merging", i, 'and', j, 'from', nclusters, 'similarity:', sprintf("%.02f", best$ji[1]), "\r", sep=" "))
