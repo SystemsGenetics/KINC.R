@@ -71,11 +71,12 @@ loadKINCNetwork = function(network_file, nrows=-1, skip=0) {
     net = read.table(file=network_file, header = header, sep="\t", colClasses=colClasses, nrows=nrows, skip=skip)
   }
   if (type == 'tidy') {
-    # Get the number of columns in the file and set the column classes.
-    # The tidy format has 10 columns.
-    colClasses = c(
-      "character", "character", "numeric", "character", "numeric",
-      "numeric", "character", "character", "numeric", "numeric")
+    colClasses = recode(colnames(headers), "Source" = "character", "Target" = "character",
+                        "Similarity_Score" = "numeric", "Interaction" = "character",
+                        "Cluster_Index" = "numeric", "Cluster_Size" = "numeric",
+                        "Samples" = "character", "Test_Name" = "character" ,
+                        "p_value" = "numeric", "r_squared" = "numeric", "rank" = "numeric",
+                        "WAnova_Max" = "numeric", "WAnova_Min" = "numeric", "MissingTtest" = "numeric")
     net = read.table(file=network_file, header = header, sep="\t", colClasses=colClasses, na.strings="nan", nrows=nrows, skip=skip)
   }
 
@@ -159,8 +160,9 @@ saveKINCNetwork = function(net, network_file, append=FALSE) {
 #'   type of class will be included. For example, if the Test_Name value is
 #'   'Subspecies__Japonica' the class is 'Subspecies'.  If no value is provided
 #'   then the filter defaults to 'full'.
+#'
 #' @export
-  saveConditionKINCNetwork = function(net, network_file, conditions=c(), filter='label') {
+saveConditionKINCNetwork = function(net, network_file, conditions=c(), filter='label') {
   if (!'Test_Name' %in% colnames(net)) {
     message('ERROR: Please provide a network dataframe in Tidy format to save condition-specific networks.')
     return(NA)
@@ -223,12 +225,22 @@ saveKINCNetwork = function(net, network_file, append=FALSE) {
 #' @param net
 #'   A network data frame containing the KINC-produced network.  The loadNetwork
 #'   function imports a dataframe in the correct format for this function.
+#' @param add.attrs
+#'   Set to TRUE to include all the attributes
 #' @return
 #'   An iGraph object.
 #'
 #' @export
-KINCtoIgraph = function(net) {
+KINCtoIgraph = function(net, add.attrs = FALSE) {
   g = graph.edgelist(as.matrix(net[, c('Source', 'Target')]), directed = FALSE)
+
+  attrs = colnames(net)
+  for (attr in attrs) {
+    if (attr == 'Source' | attr == 'Target') {
+      next
+    }
+    edge_attr(g, attr) = net[, attr]
+  }
   return(g)
 }
 
@@ -617,7 +629,8 @@ plotEdgeCountPerCondition = function(net, out_prefix=NA) {
 #'   to the order of edges in the provided network dataframe.
 #'
 #' @export
-getEdgeRanks = function(net, by_condition = TRUE, sscore_weight = 1, pval_weight = 1, rsqr_weight = 1) {
+getEdgeRanks = function(net, by_condition = TRUE, sscore_weight = 1, pval_weight = 1,
+                        rsqr_weight = 1, anova_weight=1) {
 
   if (!'Test_Name' %in% colnames(net)) {
     message('ERROR: Please provide a network dataframe in Tidy format to generate plots.')
@@ -628,7 +641,8 @@ getEdgeRanks = function(net, by_condition = TRUE, sscore_weight = 1, pval_weight
     net = getRanks(net)
     valuations = (net$score_rank * sscore_weight) +
                  (net$pval_rank * pval_weight) +
-                 (net$rsqr_rank * rsqr_weight)
+                 (net$rsqr_rank * rsqr_weight) +
+                 (net$anova_rank * anova_weight)
     net$valuation = valuations
 
     # Now order the valuations
@@ -648,8 +662,9 @@ getEdgeRanks = function(net, by_condition = TRUE, sscore_weight = 1, pval_weight
 
       # calculate the valuation for each edge.
       valuations = (csGCN$score_rank * sscore_weight) +
-                  (csGCN$pval_rank * pval_weight) +
-                  (csGCN$rsqr_rank * rsqr_weight)
+                   (csGCN$pval_rank * pval_weight) +
+                   (csGCN$rsqr_rank * rsqr_weight) +
+                   (csGCN$anova_rank * anova_weight)
       csGCN$valuation = valuations
 
       # Now order the valuations
@@ -687,9 +702,14 @@ getRanks = function(net) {
   ordered_rsqr = unique_rsqr[order(unique_rsqr, decreasing=TRUE)]
   rsqr_ranks = data.frame(r_squared = ordered_rsqr, rsqr_rank = seq(1:length(ordered_rsqr)))
 
+  unique_anova = unique(net$WAnova_Max)
+  ordered_anova = unique_anova[order(unique_anova)]
+  anova_ranks = data.frame(anova = ordered_anova, anova_rank = seq(1:length(ordered_anova)))
+
   net = left_join(net, score_ranks, by=c('ABS_Similarity_Score' = 'score'))
   net = left_join(net, pval_ranks, by=c('p_value' = 'p_value'))
   net = left_join(net, rsqr_ranks, by=c('r_squared' = 'r_squared'))
+  net = left_join(net, anova_ranks, by=c('WAnova_Max' = 'anova'))
 
   return (net)
 }
@@ -1249,7 +1269,8 @@ plot2DPair = function(gene1, gene2, osa, ematrix, net = NA,
 #'   ordered by expression level.
 #' @export
 plot2DEdgeReport <- function(edge_indexes, osa, net, ematrix,
-                             field = NA, field2 = field, show.legend=TRUE) {
+                             field = NA, field2 = field, show.legend=TRUE,
+                             control=c()) {
   j = 1
   done = FALSE;
   while (!done) {
@@ -1257,7 +1278,7 @@ plot2DEdgeReport <- function(edge_indexes, osa, net, ematrix,
     source = net[i, 'Source']
     target = net[i, 'Target']
 
-    plot2DPairReport(source, target, osa, net, ematrix, field, field2, show.legend)
+    plot2DPairReport(source, target, osa, net, ematrix, field, field2, show.legend, control=control)
 
     if (length(edge_indexes) == 1) {
       return
@@ -1304,7 +1325,8 @@ plot2DEdgeReport <- function(edge_indexes, osa, net, ematrix,
 #'   ordered by expression level.
 #' @export
 plot2DPairReport <-function(gene1, gene2, osa, net, ematrix,
-                            field = NA, field2 = field, show.legend=TRUE) {
+                            field = NA, field2 = field, show.legend=TRUE,
+                            control = c()) {
 
   # If we have an edge in the network for this pair then we'll change
   # the size of the points to match
@@ -1315,6 +1337,12 @@ plot2DPairReport <-function(gene1, gene2, osa, net, ematrix,
     samples = getEdgeSamples(edge, net)
     groups = rep('Out', length(colnames(ematrix)))
     groups[samples] = "In"
+    if (length(control) > 0) {
+      groups = rep('Other', length(colnames(ematrix)))
+      groups[samples] = "In"
+      groups[control] = "Control"
+    }
+
     groups = data.frame(groups)
     row.names(groups) = colnames(ematrix)
   }
@@ -1349,7 +1377,10 @@ plot2DPairReport <-function(gene1, gene2, osa, net, ematrix,
 
 #' Finds Linked communities in the network.
 #'
-#' This function generates three output files that it writes to the current
+#' This function uses the linked communities (linkcomm) method for module discover. This
+#' approaches finds modules of edges rather than modules of nodes.  This allows
+#' nodes to be in more than one module better supporting the concept of multifunctional
+#' genes. This function generates three output files that it writes to the current
 #' working directory.
 #'
 #' @param net
@@ -1377,13 +1408,13 @@ plot2DPairReport <-function(gene1, gene2, osa, net, ematrix,
 #'   must exist in a subgraph for communities to be identified.
 #' @param ignore_inverse
 #'   If TRUE inverese edges are removed from the analysis. Defaults to TRUE
-#'   
+#'
 #' @return
 #'   The linked communities object.
 #' @export
 #'
 findLinkedCommunities = function(net, file_prefix="net", module_prefix = 'M',
-                                 hcmethod = 'complete', meta = TRUE, 
+                                 hcmethod = 'ward.D', meta = TRUE,
                                  ignore_inverse = TRUE, th=0.5, min.vertices=10) {
   new_net = net
   new_net$Module = NA
@@ -1509,7 +1540,7 @@ mergeCommunities = function(lc, th = 0.5){
 }
 
 #' The recursive merging function called by mergeCommunities().
-#' This is a helper function for the findLinkedCommunities() and mergeCommunities 
+#' This is a helper function for the findLinkedCommunities() and mergeCommunities
 #' functions and is not meant to be called on its own.
 mergeClusters = function(cedges, cnodes, th) {
   nclusters = length(cedges)

@@ -336,7 +336,9 @@ drawEdgeListHeatMap = function(edge_indexes, osa, net, fieldOrder) {
 #'   A network dataframe containing the KINC-produced network.  The loadNetwork
 #'   function imports a dataframe in the correct format for this function.
 #' @param ematrix
-#'   The expression matrix data frame.
+#'   The expression matrix data frame. The expression matrix must have the samples
+#'   ordered in the same order that was provided to KINC and which matches the
+#'   'Samples" string column in the network.
 #' @param threads
 #'   The number of computational threads to use for parallel processing. By
 #'   default, all but 2 cores available on the local machine will be used.
@@ -345,6 +347,16 @@ drawEdgeListHeatMap = function(edge_indexes, osa, net, fieldOrder) {
 #'   checks for differential expression of the GMM cluster vs non-cluster for each gene,
 #'   thus, two tests are performed: one for each gene in the edge.  Edges with both tests
 #'   having P-values below this value, are kept.
+#' @param wa_samples
+#'   The list of numeric column indexes in the expression matrix that can be considered
+#'   "control" samples. When multiple conditions are present in an experiment we will
+#'   want to perform the Welch Anova test on the cluster vs the control (or base) rather
+#'   than on all of the non-cluster samples. This is because a gene may be differentically
+#'   expressed in one gene in a condition other than the one being tested and this can
+#'   result in a cluster showing as signficantly different because the variance of the
+#'   outgroup is wider in the gene with differential expression in another condition. By
+#'   only performing Welch's Anova on the "control" or base group it prevents this bias.
+#'   There must be at least 10 samples in this list for comparision.
 #' @param mtt_th
 #'   The signficance threshold for performing the paired T-test for missingness. This test
 #'   checks for signicant difference in missingness between the two genes of an edge.
@@ -352,10 +364,11 @@ drawEdgeListHeatMap = function(edge_indexes, osa, net, fieldOrder) {
 #'   the relationship if that missigness is condition-specific. Only edges whose
 #'   genes have the same pattern of missingness should be considered.  Those with
 #'   p-values greater than the threshold are considered non-different.
-#'
 #' @export
-filterBiasedEdges <- function(net, ematrix, threads=0, wa_th = 1e-3, mtt_th = 0.1) {
+filterBiasedEdges <- function(net, ematrix, threads=0, wa_th = 1e-3, mtt_th = 0.1,
+                              wa_samples = c()) {
 
+  min_samples = max(c(30, min(net$Cluster_Size)))
   # Use all but two CPU cores. If there aren't more
   # than 2 then just default to using 1.
   if (threads == 0) {
@@ -367,8 +380,9 @@ filterBiasedEdges <- function(net, ematrix, threads=0, wa_th = 1e-3, mtt_th = 0.
   }
   cl = makeCluster(threads)
 
-  clusterExport(cl, c("ematrix", "performBiasTests", "getEdgeSamples", "getMissingEdgeSamples", "getNonEdgeSamples"))
-  results = pbapply(net, 1, performBiasTests, cl=cl)
+  clusterExport(cl, c("ematrix", "wa_samples", "performBiasTests", "getEdgeSamples",
+                      "getMissingEdgeSamples", "getNonEdgeSamples"))
+  results = pbapply(net, 1, performBiasTests, min_samples=min_samples, cl=cl)
   stopCluster(cl)
 
   results = as.data.frame(t(results), stringsAsFactors=FALSE)
@@ -377,8 +391,8 @@ filterBiasedEdges <- function(net, ematrix, threads=0, wa_th = 1e-3, mtt_th = 0.
   results$Similarity_Score = as.numeric(results$Similarity_Score)
   results$Cluster_Index = as.numeric(results$Cluster_Index)
   results$Cluster_Size = as.numeric(results$Cluster_Size)
-  results$SourceWAnova = as.numeric(results$SourceWAnova)
-  results$TargetWAnova = as.numeric(results$TargetWAnova)
+  results$WAnova_Max = as.numeric(results$WAnova_Max)
+  results$WAnova_Min = as.numeric(results$WAnova_Min)
   results$MissingTtest = as.numeric(results$MissingTtest)
 
   # Handle differences between tidy and not tidy networks.
@@ -394,11 +408,10 @@ filterBiasedEdges <- function(net, ematrix, threads=0, wa_th = 1e-3, mtt_th = 0.
   # Keep any edges that pass the filters or have an NA for each test.  The
   # NA for a test indicates the test could not be run and therefore the
   # edge could not be excluded.
-  keep = which((results$SourceWAnova <= wa_th | is.na(results$SourceWAnova)) &
-               (results$TargetWAnova <= wa_th | is.na(results$TargetWAnova)) &
+  keep = which((results$WAnova_Max <= wa_th | is.na(results$WAnova_Max)) &
                (results$MissingTtest >= mtt_th | is.na(results$MissingTtest)))
 
-  return (net[keep,])
+  return (results[keep,])
 }
 
 #' A helper function for the filterBiasedEdges.
@@ -409,15 +422,24 @@ filterBiasedEdges <- function(net, ematrix, threads=0, wa_th = 1e-3, mtt_th = 0.
 #'   The row from the network dataframe.
 #'
 #' @export
-performBiasTests <- function(row) {
+performBiasTests <- function(row, min_samples=30) {
   gene1 = row['Source']
   gene2 = row['Target']
-  row['SourceWAnova'] = NA
-  row['TargetWAnova'] = NA
+  row['WAnova_Max'] = NA
+  row['WAnova_Min'] = NA
   row['MissingTtest'] = NA
   cluster_samples = getEdgeSamples(1, t(as.data.frame(row)))
   non_cluster_samples = getNonEdgeSamples(1, t(as.data.frame(row)))
   missing_samples = getMissingEdgeSamples(1, t(as.data.frame(row)))
+
+  # Remove the missing samples from the non_cluster_samples
+  non_cluster_samples = non_cluster_samples[which(!non_cluster_samples %in% missing_samples)]
+
+  # If the user provided the list of control or base samples then
+  # we want to restrict the non cluster samples to only that list.
+  if (length(wa_samples) > 0) {
+    non_cluster_samples = non_cluster_samples[which(non_cluster_samples %in% wa_samples)]
+  }
 
   # First, perform a Welch's ANOVA test for both genes of every network edge.
   # The Welch's Anova test is used for heteroscedastic data (non-equal variance)
@@ -427,36 +449,59 @@ performBiasTests <- function(row) {
 
   # Only perform the test if we have at least 10 samples in and
   # out of the cluster.
-  if (length(non_cluster_samples) - length(missing_samples) >= 10 &
+  if (length(non_cluster_samples) >= 10 &
       length(cluster_samples) >= 10) {
 
     # Get the expression vectors of the samples not in the cluster
     # and remove outliers. We don't need to do this for the in-cluster
     # samples because clusters should be normal and have outliers removed
     # by KINC.
-    ncs1 = as.vector(t(ematrix[gene1, non_cluster_samples]))
-    ncs2 = as.vector(t(ematrix[gene2, non_cluster_samples]))
+    ncs1 = as.vector(t(ematrix[gene1,]))
+    ncs2 = as.vector(t(ematrix[gene2,]))
+    ncs1[!seq(1:dim(ematrix)[2]) %in% non_cluster_samples] = NA
+    ncs2[!seq(1:dim(ematrix)[2]) %in% non_cluster_samples] = NA
     b1 = boxplot(ncs1, plot = FALSE)
     b2 = boxplot(ncs2, plot = FALSE)
-    # remove the outliers from the original expression data for the gene
+    ncs1[which(ncs1 %in% b1$out)] = NA
+    ncs2[which(ncs2 %in% b2$out)] = NA
+
+    # Get the expression of the genes for only the cluster samples
+    # and the non_cluster samples.
     g1 = as.vector(t(ematrix[gene1,]))
     g2 = as.vector(t(ematrix[gene2,]))
-    g1[which(g1 %in% b1$out)] = NA
-    g2[which(g2 %in% b2$out)] = NA
+    g1[!seq(1:dim(ematrix)[2]) %in% cluster_samples] = NA
+    g2[!seq(1:dim(ematrix)[2]) %in% cluster_samples] = NA
+    g1[non_cluster_samples] = ncs1[non_cluster_samples]
+    g2[non_cluster_samples] = ncs2[non_cluster_samples]
 
-    # Create an array of which samples are in/out of the cluster
-    position = rep('Out',dim(ematrix)[2])
-    position[cluster_samples] = 'In'
+    # We'll do bootstrapping so that we can subsample and
+    # ensure comparable p-values.
+    source_anova = 0
+    target_anova = 0
+    num_repeats = 15
+    for (i in 1:num_repeats) {
 
-    # Perform the Welch one-way ANOVA test on in/out of gene1
-    source = data.frame(Position = position, Expression = g1)
-    w1 = oneway.test(Expression ~ Position, data=source, var.equal=FALSE)
-    row['SourceWAnova'] = w1$p.value
+      # Create an array of which samples are in/out of the cluster/
+      # We will limit the sample to only 10 items so that p-values
+      # between clusters are comparable.
+      inout = rep(NA,dim(ematrix)[2])
+      inout[sample(cluster_samples, min_samples, replace=TRUE)] = 'In'
+      inout[sample(non_cluster_samples, min_samples, replace=TRUE)] = 'Out'
 
-    # Perform the Welch one-way ANOVA test on in/out of gene2
-    target = data.frame(Position = position, Expression = g2)
-    w2 = oneway.test(Expression ~ Position, data=target, var.equal=FALSE)
-    row['TargetWAnova'] = w2$p.value
+      # Perform the Welch one-way ANOVA test on in/out of gene1
+      source = na.omit(data.frame(InOut = inout, Expression = g1))
+      w1 = oneway.test(Expression ~ InOut, data=source, var.equal=FALSE)
+      source_anova = source_anova + w1$p.value
+
+      # Perform the Welch one-way ANOVA test on in/out of gene2
+      target = na.omit(data.frame(InOut = inout, Expression = g2))
+      w2 = oneway.test(Expression ~ InOut, data=target, var.equal=FALSE)
+      target_anova = target_anova + w2$p.value
+    }
+    source_anova = source_anova / num_repeats
+    target_anova = target_anova / num_repeats
+    row['WAnova_Max'] = max(source_anova, target_anova)
+    row['WAnova_Min'] = min(source_anova, target_anova)
   }
 
   # Let's do one more check to make sure there isn't bias in the missigness.
@@ -478,6 +523,11 @@ performBiasTests <- function(row) {
     t = t.test(g1m, g2m, paired = TRUE, alternative = "two.sided")
     row['MissingTtest'] = t$p.value
   }
+
+  # Perform multiple testing correction.
+  #row['WAnova_Max'] = p.adjust(row['WAnova_Max'], 'BH')
+  #row['WAnova_Min'] = p.adjust(row['WAnova_Min'], 'BH')
+  #row['MissingTtest'] = p.adjust(row['MissingTtest'], 'BH')
 
   return(row)
 }

@@ -3,13 +3,13 @@
 \name{mergeClusters}
 \alias{mergeClusters}
 \title{The recursive merging function called by mergeCommunities().
-This is a helper function for the findLinkedCommunities() and mergeCommunities 
+This is a helper function for the findLinkedCommunities() and mergeCommunities
 functions and is not meant to be called on its own.}
 \usage{
 mergeClusters(cedges, cnodes, th)
 }
 \description{
 The recursive merging function called by mergeCommunities().
-This is a helper function for the findLinkedCommunities() and mergeCommunities 
+This is a helper function for the findLinkedCommunities() and mergeCommunities
 functions and is not meant to be called on its own.
 }

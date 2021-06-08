@@ -104,7 +104,7 @@ getPairGMMEdges = function(source, target, ematrix, minc = 30,
   X$cluster = best@partition
   S[X$index, 'cluster'] = X$cluster
 
-  # Itearate through the clusters, remove outliers, perform correlation
+  # Iterate through the clusters, remove outliers, perform correlation
   # analyis and if the correlation value is > then the threshodl, add the
   # cluster as an edge.
   for (ci in 1:best@nbCluster) {

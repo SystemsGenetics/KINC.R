@@ -8,7 +8,7 @@ findLinkedCommunities(
   net,
   file_prefix = "net",
   module_prefix = "M",
-  hcmethod = "complete",
+  hcmethod = "ward.D",
   meta = TRUE,
   ignore_inverse = TRUE,
   th = 0.5,
@@ -45,6 +45,9 @@ must exist in a subgraph for communities to be identified.}
 The linked communities object.
 }
 \description{
-This function generates three output files that it writes to the current
+This function uses the linked communities (linkcomm) method for module discover. This
+approaches finds modules of edges rather than modules of nodes.  This allows
+nodes to be in more than one module better supporting the concept of multifunctional
+genes. This function generates three output files that it writes to the current
 working directory.
 }
