@@ -380,7 +380,8 @@ filterBiasedEdges <- function(net, ematrix, threads=0, wa_th = 1e-3, mtt_th = 0.
   }
   cl = makeCluster(threads)
 
-  clusterExport(cl, c("ematrix", "wa_samples", "performBiasTests", "getEdgeSamples",
+  clusterExport(cl, c("ematrix", "wa_samples", "performBiasTests", "testEdgeVariance",
+                      "testEdgeMissigness", "getEdgeSamples",
                       "getMissingEdgeSamples", "getNonEdgeSamples"))
   results = pbapply(net, 1, performBiasTests, min_samples=min_samples, cl=cl)
   stopCluster(cl)
@@ -409,7 +410,7 @@ filterBiasedEdges <- function(net, ematrix, threads=0, wa_th = 1e-3, mtt_th = 0.
   # NA for a test indicates the test could not be run and therefore the
   # edge could not be excluded.
   keep = which((results$WAnova_Max <= wa_th | is.na(results$WAnova_Max)) &
-               (results$MissingTtest >= mtt_th | is.na(results$MissingTtest)))
+               (results$MissingTtest >= mtt_th))
 
   return (results[keep,])
 }
@@ -423,11 +424,34 @@ filterBiasedEdges <- function(net, ematrix, threads=0, wa_th = 1e-3, mtt_th = 0.
 #'
 #' @export
 performBiasTests <- function(row, min_samples=30) {
+  row['WAnova_Max'] = NA
+  row['WAnova_Min'] = NA
+  row['MissingTtest'] = NA
+
+  #row = testEdgeVariance(row, min_samples)
+  row = testEdgeMissingness(row)
+
+
+  # Perform multiple testing correction.
+  #row['WAnova_Max'] = p.adjust(row['WAnova_Max'], 'BH')
+  #row['WAnova_Min'] = p.adjust(row['WAnova_Min'], 'BH')
+  #row['MissingTtest'] = p.adjust(row['MissingTtest'], 'BH')
+
+  return(row)
+}
+
+
+#' Tests an edge for bias due to non differential variance.
+#'
+#' @param row
+#'   The row from the network dataframe.
+#'
+#' @export
+testEdgeVariance = function(row, min_samples=30) {
   gene1 = row['Source']
   gene2 = row['Target']
   row['WAnova_Max'] = NA
   row['WAnova_Min'] = NA
-  row['MissingTtest'] = NA
   cluster_samples = getEdgeSamples(1, t(as.data.frame(row)))
   non_cluster_samples = getNonEdgeSamples(1, t(as.data.frame(row)))
   missing_samples = getMissingEdgeSamples(1, t(as.data.frame(row)))
@@ -503,6 +527,19 @@ performBiasTests <- function(row, min_samples=30) {
     row['WAnova_Max'] = max(source_anova, target_anova)
     row['WAnova_Min'] = min(source_anova, target_anova)
   }
+  return(row)
+}
+
+#' Tests an edge for bias from unequal patterns of missingness.
+#'
+#' @param row
+#'   The row from the network dataframe.
+#'
+#' @export
+testEdgeMissigness = function(row) {
+  gene1 = row['Source']
+  gene2 = row['Target']
+  row['MissingTtest'] = NA
 
   # Let's do one more check to make sure there isn't bias in the missigness.
   # Convert the missigness of both genes to a feature where 1 == missing
@@ -522,13 +559,9 @@ performBiasTests <- function(row, min_samples=30) {
     # We should not keep this edge.
     t = t.test(g1m, g2m, paired = TRUE, alternative = "two.sided")
     row['MissingTtest'] = t$p.value
+  } else {
+    row['MissingTtest'] = 1
   }
-
-  # Perform multiple testing correction.
-  #row['WAnova_Max'] = p.adjust(row['WAnova_Max'], 'BH')
-  #row['WAnova_Min'] = p.adjust(row['WAnova_Min'], 'BH')
-  #row['MissingTtest'] = p.adjust(row['MissingTtest'], 'BH')
-
   return(row)
 }
 
