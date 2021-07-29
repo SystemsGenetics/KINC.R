@@ -1036,17 +1036,19 @@ plot3DEdgeList = function(edge_indexes, osa, net, ematrix, field, label_field = 
 #'
 #' @param gene
 #'   The name of the gene to plot
-#' @param ematrix
-#'   The expression matrix.
 #' @param osa
 #'   The sample annotation matrix. One column must contain the header 'Sample'
 #'   and the remaining colums correspond to an annotation type.  The rows
 #'   of the anntation columns should contain the annotations.
+#' @param ematrix
+#'   The expression matrix.
+#' @param ingroup
+#'   A list of sample names that are considered the "ingroup". This could be,
+#'   for exapmle, a GMM cluster.  These samples will be drawn in a larager
+#'   size..
 #' @param field
 #'   The name of the field by which to order the points along the
 #'   x-axis.
-#' @param xlab
-#'   The label for the x-axis
 #' @param colfield
 #'   The field in the OSA that should be used to color the points. Each
 #'   category in the field recieves a unique color.
@@ -1057,27 +1059,27 @@ plot3DEdgeList = function(edge_indexes, osa, net, ematrix, field, label_field = 
 #' @param highlight
 #'   A vector of sample indexes to highlight in the plot.
 #' @export
-plotGene = function(gene, ematrix, osa, field, xlab = field, colfield = field,
-                    show.legend=TRUE, fig_title = NA, highlight=c()) {
+plotGene = function(gene, osa, ematrix, field, ingroup=c(), colfield = field,
+                    show.legend=TRUE, fig_title = NA) {
 
   condition = data.frame(c = osa[[field]], c2 = osa[[colfield]])
   row.names(condition) = row.names(osa)
   expdata = merge(t(ematrix[gene,]), condition, by="row.names")
-  colnames(expdata) = c('Sample', 'y', 'x', 'z')
-  row.names(expdata) = make.names(row.names(expdata))
+  colnames(expdata) = c('Sample', gene, field, colfield)
+  row.names(expdata) = expdata$Sample
 
-  expdata$size = 1
-  if (length(highlight) > 0) {
-    expdata$size = 0.25
-    sample_names = colnames(ematrix)[highlight]
-    expdata$size[which(expdata$Sample %in% sample_names)] = 1
+  expdata['size'] = 0.25
+  if (length(ingroup) > 0) {
+    expdata[ingroup, 'size'] = 1
   }
 
-  expplot = ggplot(expdata, aes(x, y, color=z)) +
-    geom_point(size=expdata$size, show.legend = show.legend) +
-    xlab(xlab) + ylab(gene) +
+  # Remove missing values
+  expdata = expdata[which(!is.na(expdata[gene])),]
+
+  expplot = ggplot(expdata, aes_string(gene, field, color=colfield)) +
+    geom_point(size=expdata$size, show.legend = show.legend)
     theme(legend.title = element_blank())
-  if (!is.numeric(expdata$z)) {
+  if (!is.numeric(expdata[field])) {
     expplot = expplot + scale_color_brewer(palette="Dark2")
   }
   if (!is.null(fig_title)) {
@@ -1190,58 +1192,44 @@ plot2DEdgeList = function(edge_indexes, osa, net, ematrix,
 #'   of the anntation columns should contain the annotations.
 #' @param ematrix
 #'   The expression matrix.
-#' @param net
-#'   A network data frame containing the KINC-produced network.  The loadNetwork
-#'   function imports a dataframe in the correct format for this function.
 #' @param field
 #'   The field in the sample annotation matrix by which to split the points
 #'   into separate layers.
+#' @param ingroup
+#'   A list of sample names that are considered the "ingroup". This could be,
+#'   for exapmle, a GMM cluster.  These samples will be drawn in a larager
+#'   size..
 #' @param fig_title
 #'   A title to give the plot. Default = NULL
 #' @export
-plot2DPair = function(gene1, gene2, osa, ematrix, net = NA,
-                      field = NA, fig_title = NA, show.legend=TRUE) {
+plot2DPair = function(gene1, gene2, osa, ematrix, field, ingroup = c(),
+                      fig_title = NA, show.legend=TRUE) {
 
     # Get the gene expression and order it by the osa sample names.
     x = t(ematrix[gene1, ])
     y = t(ematrix[gene2, ])
+    coexpdata = data.frame(source = x, target = y)
 
     # Get the conditions of the field specified by the user.
-    condition = osa[colnames(ematrix),field]
-    size = 1
+    coexpdata['Category'] = osa[colnames(ematrix), field]
+    coexpdata['Group'] = 'Out'
+    coexpdata[ingroup, 'Group'] = 'In'
+    coexpdata['Size'] = 0.25
+    coexpdata[ingroup, 'Size'] = 1
 
-    # Build a datafame suitable for ggplot
-    coexpdata = data.frame(source = x, target = y, category = condition, size = size)
-    colnames(coexpdata) = c('x', 'y', 'category', 'size')
-    coexpdata = coexpdata[complete.cases(coexpdata),]
-
-    # If we have an edge in the network for this pair then we'll change
-    # the size of the points to match
-    if (!is.na(net)) {
-      edge = which((net$Source == gene1 & net$Target == gene2) | (net$Source == gene2 & net$Target == gene1))
-      if (length(edge) > 0 & 'Samples' %in% colnames(net)) {
-        print(paste("Network Edge #", edge, sep=""))
-        print(net[edge,])
-        coexpdata$size = 0.25
-        samples = getEdgeSamples(edge, net)
-        coexpdata$size[which(row.names(coexpdata) %in% colnames(ematrix)[samples])] = 1
-      }
-    }
 
     row.names(coexpdata) = make.names(row.names(coexpdata))
 
-    coexpplot = ggplot(coexpdata, aes(x, y, color=category)) +
-      geom_point(size=coexpdata$size, show.legend = show.legend) +
+    coexpplot = ggplot(coexpdata, aes_string(gene1, gene2, color='Category')) +
+      geom_point(size=coexpdata$Size, show.legend = show.legend) +
       xlab(gene1) + ylab(gene2) + labs(colour=field)
-    if (!is.numeric(coexpdata$category)) {
+    if (!is.numeric(coexpdata$Category)) {
       coexpplot = coexpplot + scale_color_brewer(palette="Dark2")
     }
     if (!is.null(fig_title)) {
       coexpplot = coexpplot + ggtitle(fig_title)
     }
     print(coexpplot)
-    r = cor(coexpdata$x, coexpdata$y, method="spearman", use="complete.obs")
-    print(r)
     return(coexpplot)
 }
 
@@ -1311,58 +1299,44 @@ plot2DEdgeReport <- function(edge_indexes, osa, net, ematrix,
 #'   The sample annotation matrix. One column must contain the header 'Sample'
 #'   and the remaining colums correspond to an annotation type.  The rows
 #'   of the anntation columns should contain the annotations.
-#' @param net
-#'   A network data frame containing the KINC-produced network.  The loadNetwork
-#'   function imports a dataframe in the correct format for this function.
 #' @param ematrix
 #'   The expression matrix.
 #' @param field
 #'   The field in the sample annotation matrix by which to split the points
 #'   into separate layers in the pairwise scatterplot
+#' @param ingroup
+#'   A list of sample names that are considered the "ingroup". This could be,
+#'   for exapmle, a GMM cluster.  These samples will be drawn in a larager
+#'   size..
 #' @param field2
 #'   The field in the sample annotation matrix by which to order points on
 #'   the y-axis of the bottom two gene expression plots. The x-axis is
 #'   ordered by expression level.
+#' @param show.lengend
+#'   Set to TRUE to display the plot legened
 #' @export
-plot2DPairReport <-function(gene1, gene2, osa, net, ematrix,
-                            field = NA, field2 = field, show.legend=TRUE,
-                            control = c()) {
+plot2DPairReport <-function(gene1, gene2, osa, ematrix, field, ingroup = c(),
+                            field2 = field, show.legend=TRUE) {
 
-  # If we have an edge in the network for this pair then we'll change
-  # the size of the points to match
-  groups = osa[c(field2, field2)]
-  edge = which((net$Source == gene1 & net$Target == gene2) | (net$Source == gene2 & net$Target == gene1))
-  samples=c()
-  if (length(edge) > 0 & 'Samples' %in% colnames(net)) {
-    samples = getEdgeSamples(edge, net)
-    groups = rep('Out', length(colnames(ematrix)))
-    groups[samples] = "In"
-    if (length(control) > 0) {
-      groups = rep('Other', length(colnames(ematrix)))
-      groups[samples] = "In"
-      groups[control] = "Control"
-    }
+  groups = osa[c(field, field2)]
+  groups['Group'] = 'Out'
+  groups[ingroup, 'Group'] = 'In'
 
-    groups = data.frame(groups)
-    row.names(groups) = colnames(ematrix)
-  }
-
-  FigYa = plot2DPair(gene1, gene2, osa, ematrix, net = net, field = field, fig_title='(a)', show.legend=TRUE)
-  FigYc = plotGene(gene1, ematrix, osa, field2, colfield=field, show.legend=TRUE, fig_title='(c)', highlight=samples)
-  FigYd = plotGene(gene2, ematrix, osa, field2, colfield=field, show.legend=TRUE, fig_title='(d)', highlight=samples)
-
-
+  FigYa = plot2DPair(gene1, gene2, osa, ematrix, ingroup=ingroup, field = field, fig_title='(a)', show.legend=TRUE)
+  FigYc = plotGene(gene1, osa, ematrix, field=field2, ingroup=ingroup, colfield=field, show.legend=TRUE, fig_title='(c)')
+  FigYd = plotGene(gene2, osa, ematrix, field=field2, ingroup=ingroup, colfield=field, show.legend=TRUE, fig_title='(d)')
 
   expdata = merge(t(ematrix[c(gene1,gene2),]), groups, by="row.names")
-  cols = c('Sample', gene1, gene2, 'Edge')
+  cols = c('Sample', gene1, gene2, field, field2)
   colnames(expdata) = cols
-  expdata = expdata[, cols]
-  expdata = melt(expdata)
+  expdata = expdata[, c('Sample', gene1, gene2, field)]
+  mexpdata = melt(expdata, id.vars=c('Sample', field), variable.name='Gene', value.name='Expression' )
   colnames(expdata) = c('Sample', 'Edge', 'Gene', 'Expression')
-  FigYb <- ggplot(arrange(expdata, Edge), aes(x=Edge, y=Expression, fill=Edge)) +
+
+  FigYb <- ggplot(mexpdata, aes_string(x=field, y="Expression", fill=field)) +
     geom_violin(trim=FALSE, show.legend=FALSE) + ggtitle('(b)') +
     geom_boxplot(width=0.1, show.legend=FALSE) +
-    scale_fill_brewer(palette="Paired") +
+    scale_fill_brewer(palette="Dark2") +
     theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
     facet_grid(. ~ Gene)
 
