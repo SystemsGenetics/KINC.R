@@ -4,10 +4,13 @@
 \alias{mergeCommunities}
 \title{Merges linked community clusters that have the most similar sets of nodes.}
 \usage{
-mergeCommunities(lc)
+mergeCommunities(lc, th = 0.5)
 }
 \arguments{
 \item{lc}{A linkcomm object.}
+
+\item{th}{Threshold to be used by `mergeClusters`. Lower threshold results in merging
+being more common.}
 }
 \value{
 A list were each element of the list is the

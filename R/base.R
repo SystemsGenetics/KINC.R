@@ -71,11 +71,12 @@ loadKINCNetwork = function(network_file, nrows=-1, skip=0) {
     net = read.table(file=network_file, header = header, sep="\t", colClasses=colClasses, nrows=nrows, skip=skip)
   }
   if (type == 'tidy') {
-    # Get the number of columns in the file and set the column classes.
-    # The tidy format has 10 columns.
-    colClasses = c(
-      "character", "character", "numeric", "character", "numeric",
-      "numeric", "character", "character", "numeric", "numeric")
+    colClasses = recode(colnames(headers), "Source" = "character", "Target" = "character",
+                        "Similarity_Score" = "numeric", "Interaction" = "character",
+                        "Cluster_Index" = "numeric", "Cluster_Size" = "numeric",
+                        "Samples" = "character", "Test_Name" = "character" ,
+                        "p_value" = "numeric", "r_squared" = "numeric", "rank" = "numeric",
+                        "WAnova_Max" = "numeric", "WAnova_Min" = "numeric", "MissingTtest" = "numeric")
     net = read.table(file=network_file, header = header, sep="\t", colClasses=colClasses, na.strings="nan", nrows=nrows, skip=skip)
   }
 
@@ -159,8 +160,9 @@ saveKINCNetwork = function(net, network_file, append=FALSE) {
 #'   type of class will be included. For example, if the Test_Name value is
 #'   'Subspecies__Japonica' the class is 'Subspecies'.  If no value is provided
 #'   then the filter defaults to 'full'.
+#'
 #' @export
-  saveConditionKINCNetwork = function(net, network_file, conditions=c(), filter='label') {
+saveConditionKINCNetwork = function(net, network_file, conditions=c(), filter='label') {
   if (!'Test_Name' %in% colnames(net)) {
     message('ERROR: Please provide a network dataframe in Tidy format to save condition-specific networks.')
     return(NA)
@@ -223,12 +225,24 @@ saveKINCNetwork = function(net, network_file, append=FALSE) {
 #' @param net
 #'   A network data frame containing the KINC-produced network.  The loadNetwork
 #'   function imports a dataframe in the correct format for this function.
+#' @param add.attrs
+#'   Set to TRUE to include all the attributes
 #' @return
 #'   An iGraph object.
 #'
 #' @export
-KINCtoIgraph = function(net) {
+KINCtoIgraph = function(net, add.attrs = FALSE) {
   g = graph.edgelist(as.matrix(net[, c('Source', 'Target')]), directed = FALSE)
+
+  if (add.attrs == TRUE) {
+    attrs = colnames(net)
+    for (attr in attrs) {
+      if (attr == 'Source' | attr == 'Target') {
+        next
+      }
+      edge_attr(g, attr) = net[, attr]
+    }
+  }
   return(g)
 }
 
@@ -617,7 +631,8 @@ plotEdgeCountPerCondition = function(net, out_prefix=NA) {
 #'   to the order of edges in the provided network dataframe.
 #'
 #' @export
-getEdgeRanks = function(net, by_condition = TRUE, sscore_weight = 1, pval_weight = 1, rsqr_weight = 1) {
+getEdgeRanks = function(net, by_condition = TRUE, sscore_weight = 1, pval_weight = 1,
+                        rsqr_weight = 1, anova_weight=1) {
 
   if (!'Test_Name' %in% colnames(net)) {
     message('ERROR: Please provide a network dataframe in Tidy format to generate plots.')
@@ -628,7 +643,8 @@ getEdgeRanks = function(net, by_condition = TRUE, sscore_weight = 1, pval_weight
     net = getRanks(net)
     valuations = (net$score_rank * sscore_weight) +
                  (net$pval_rank * pval_weight) +
-                 (net$rsqr_rank * rsqr_weight)
+                 (net$rsqr_rank * rsqr_weight) +
+                 (net$anova_rank * anova_weight)
     net$valuation = valuations
 
     # Now order the valuations
@@ -648,8 +664,9 @@ getEdgeRanks = function(net, by_condition = TRUE, sscore_weight = 1, pval_weight
 
       # calculate the valuation for each edge.
       valuations = (csGCN$score_rank * sscore_weight) +
-                  (csGCN$pval_rank * pval_weight) +
-                  (csGCN$rsqr_rank * rsqr_weight)
+                   (csGCN$pval_rank * pval_weight) +
+                   (csGCN$rsqr_rank * rsqr_weight) +
+                   (csGCN$anova_rank * anova_weight)
       csGCN$valuation = valuations
 
       # Now order the valuations
@@ -687,9 +704,14 @@ getRanks = function(net) {
   ordered_rsqr = unique_rsqr[order(unique_rsqr, decreasing=TRUE)]
   rsqr_ranks = data.frame(r_squared = ordered_rsqr, rsqr_rank = seq(1:length(ordered_rsqr)))
 
-  net = left_join(net ,score_ranks, by=c('ABS_Similarity_Score' = 'score'))
+  unique_anova = unique(net$WAnova_Max)
+  ordered_anova = unique_anova[order(unique_anova)]
+  anova_ranks = data.frame(anova = ordered_anova, anova_rank = seq(1:length(ordered_anova)))
+
+  net = left_join(net, score_ranks, by=c('ABS_Similarity_Score' = 'score'))
   net = left_join(net, pval_ranks, by=c('p_value' = 'p_value'))
   net = left_join(net, rsqr_ranks, by=c('r_squared' = 'r_squared'))
+  net = left_join(net, anova_ranks, by=c('WAnova_Max' = 'anova'))
 
   return (net)
 }
@@ -1016,17 +1038,19 @@ plot3DEdgeList = function(edge_indexes, osa, net, ematrix, field, label_field = 
 #'
 #' @param gene
 #'   The name of the gene to plot
-#' @param ematrix
-#'   The expression matrix.
 #' @param osa
 #'   The sample annotation matrix. One column must contain the header 'Sample'
 #'   and the remaining colums correspond to an annotation type.  The rows
 #'   of the anntation columns should contain the annotations.
+#' @param ematrix
+#'   The expression matrix.
+#' @param ingroup
+#'   A list of sample names that are considered the "ingroup". This could be,
+#'   for exapmle, a GMM cluster.  These samples will be drawn in a larager
+#'   size..
 #' @param field
 #'   The name of the field by which to order the points along the
 #'   x-axis.
-#' @param xlab
-#'   The label for the x-axis
 #' @param colfield
 #'   The field in the OSA that should be used to color the points. Each
 #'   category in the field recieves a unique color.
@@ -1037,33 +1061,32 @@ plot3DEdgeList = function(edge_indexes, osa, net, ematrix, field, label_field = 
 #' @param highlight
 #'   A vector of sample indexes to highlight in the plot.
 #' @export
-plotGene = function(gene, ematrix, osa, field, xlab = field, colfield = field,
-                    show.legend=TRUE, fig_title = NA, highlight=c()) {
+plotGene = function(gene, osa, ematrix, field, ingroup=c(), colfield = field,
+                    show.legend=TRUE, fig_title = NA) {
 
   condition = data.frame(c = osa[[field]], c2 = osa[[colfield]])
   row.names(condition) = row.names(osa)
   expdata = merge(t(ematrix[gene,]), condition, by="row.names")
-  colnames(expdata) = c('Sample', 'y', 'x', 'z')
-  row.names(expdata) = make.names(row.names(expdata))
+  colnames(expdata) = c('Sample', gene, field, colfield)
+  row.names(expdata) = expdata$Sample
 
-  expdata$size = 1
-  if (length(highlight) > 0) {
-    expdata$size = 0.25
-    sample_names = colnames(ematrix)[highlight]
-    expdata$size[which(expdata$Sample %in% sample_names)] = 1
+  expdata['size'] = 0.25
+  if (length(ingroup) > 0) {
+    expdata[ingroup, 'size'] = 1
   }
 
-  expplot = ggplot(expdata, aes(x, y, color=z)) +
-    geom_point(size=expdata$size, show.legend = show.legend) +
-    xlab(xlab) + ylab(gene) +
+  # Remove missing values
+  expdata = expdata[which(!is.na(expdata[gene])),]
+
+  expplot = ggplot(expdata, aes_string(gene, field, color=colfield)) +
+    geom_point(size=expdata$size, show.legend = show.legend)
     theme(legend.title = element_blank())
-  if (!is.numeric(expdata$z)) {
+  if (!is.numeric(expdata[field])) {
     expplot = expplot + scale_color_brewer(palette="Dark2")
   }
   if (!is.null(fig_title)) {
     expplot = expplot + ggtitle(fig_title)
   }
-  print(expplot)
   return(expplot)
 }
 
@@ -1135,7 +1158,6 @@ plot2DEdgeList = function(edge_indexes, osa, net, ematrix,
     if (!is.null(fig_title)) {
       coexpplot = coexpplot + ggtitle(fig_title)
     }
-    print(coexpplot)
 
     if (length(edge_indexes) == 1) {
       return(coexpplot)
@@ -1168,57 +1190,45 @@ plot2DEdgeList = function(edge_indexes, osa, net, ematrix,
 #'   The sample annotation matrix. One column must contain the header 'Sample'
 #'   and the remaining colums correspond to an annotation type.  The rows
 #'   of the anntation columns should contain the annotations.
-#' @param net
-#'   A network data frame containing the KINC-produced network.  The loadNetwork
-#'   function imports a dataframe in the correct format for this function.
 #' @param ematrix
 #'   The expression matrix.
 #' @param field
 #'   The field in the sample annotation matrix by which to split the points
 #'   into separate layers.
+#' @param ingroup
+#'   A list of sample names that are considered the "ingroup". This could be,
+#'   for exapmle, a GMM cluster.  These samples will be drawn in a larager
+#'   size..
 #' @param fig_title
 #'   A title to give the plot. Default = NULL
 #' @export
-plot2DPair = function(gene1, gene2, osa, net, ematrix,
-                      field = NA, fig_title = NA, show.legend=TRUE) {
+plot2DPair = function(gene1, gene2, osa, ematrix, field, ingroup = c(),
+                      fig_title = NA, show.legend=TRUE) {
 
     # Get the gene expression and order it by the osa sample names.
     x = t(ematrix[gene1, ])
     y = t(ematrix[gene2, ])
+    coexpdata = data.frame(source = x, target = y)
 
     # Get the conditions of the field specified by the user.
-    condition = osa[colnames(ematrix),field]
-    size = 1
+    coexpdata['Category'] = osa[colnames(ematrix), field]
+    coexpdata['Group'] = 'Out'
+    coexpdata[ingroup, 'Group'] = 'In'
+    coexpdata['Size'] = 0.25
+    coexpdata[ingroup, 'Size'] = 1
 
-    # Build a datafame suitable for ggplot
-    coexpdata = data.frame(source = x, target = y, category = condition, size = size)
-    colnames(coexpdata) = c('x', 'y', 'category', 'size')
-    coexpdata = coexpdata[complete.cases(coexpdata),]
-
-    # If we have an edge in the network for this pair then we'll change
-    # the size of the points to match
-    edge = which((net$Source == gene1 & net$Target == gene2) | (net$Source == gene2 & net$Target == gene1))
-    if (edge & 'Samples' %in% colnames(net)) {
-      print(paste("Network Edge #", edge, sep=""))
-      coexpdata$size = 0.25
-      samples = getEdgeSamples(edge, net)
-      coexpdata$size[which(row.names(coexpdata) %in% colnames(ematrix)[samples])] = 1
-    }
 
     row.names(coexpdata) = make.names(row.names(coexpdata))
 
-    coexpplot = ggplot(coexpdata, aes(x, y, color=category)) +
-      geom_point(size=coexpdata$size, show.legend = show.legend) +
+    coexpplot = ggplot(coexpdata, aes_string(gene1, gene2, color='Category')) +
+      geom_point(size=coexpdata$Size, show.legend = show.legend) +
       xlab(gene1) + ylab(gene2) + labs(colour=field)
-    if (!is.numeric(coexpdata$category)) {
+    if (!is.numeric(coexpdata$Category)) {
       coexpplot = coexpplot + scale_color_brewer(palette="Dark2")
     }
     if (!is.null(fig_title)) {
       coexpplot = coexpplot + ggtitle(fig_title)
     }
-    print(coexpplot)
-    r = cor(coexpdata$x, coexpdata$y, method="spearman", use="complete.obs")
-    print(r)
     return(coexpplot)
 }
 
@@ -1246,7 +1256,8 @@ plot2DPair = function(gene1, gene2, osa, net, ematrix,
 #'   ordered by expression level.
 #' @export
 plot2DEdgeReport <- function(edge_indexes, osa, net, ematrix,
-                             field = NA, field2 = field, show.legend=TRUE) {
+                             field = NA, field2 = field, show.legend=TRUE,
+                             control=c()) {
   j = 1
   done = FALSE;
   while (!done) {
@@ -1254,7 +1265,7 @@ plot2DEdgeReport <- function(edge_indexes, osa, net, ematrix,
     source = net[i, 'Source']
     target = net[i, 'Target']
 
-    plot2DPairReport(source, target, osa, net, ematrix, field, field2, show.legend)
+    plot2DPairReport(source, target, osa, net, ematrix, field, field2, show.legend, control=control)
 
     if (length(edge_indexes) == 1) {
       return
@@ -1287,51 +1298,44 @@ plot2DEdgeReport <- function(edge_indexes, osa, net, ematrix,
 #'   The sample annotation matrix. One column must contain the header 'Sample'
 #'   and the remaining colums correspond to an annotation type.  The rows
 #'   of the anntation columns should contain the annotations.
-#' @param net
-#'   A network data frame containing the KINC-produced network.  The loadNetwork
-#'   function imports a dataframe in the correct format for this function.
 #' @param ematrix
 #'   The expression matrix.
 #' @param field
 #'   The field in the sample annotation matrix by which to split the points
 #'   into separate layers in the pairwise scatterplot
+#' @param ingroup
+#'   A list of sample names that are considered the "ingroup". This could be,
+#'   for exapmle, a GMM cluster.  These samples will be drawn in a larager
+#'   size..
 #' @param field2
 #'   The field in the sample annotation matrix by which to order points on
 #'   the y-axis of the bottom two gene expression plots. The x-axis is
 #'   ordered by expression level.
+#' @param show.lengend
+#'   Set to TRUE to display the plot legened
 #' @export
-plot2DPairReport <-function(gene1, gene2, osa, net, ematrix,
-                            field = NA, field2 = field, show.legend=TRUE) {
+plot2DPairReport <-function(gene1, gene2, osa, ematrix, field, ingroup = c(),
+                            field2 = field, show.legend=TRUE) {
 
-  # If we have an edge in the network for this pair then we'll change
-  # the size of the points to match
-  groups = osa[c(field2, field2)]
-  edge = which((net$Source == gene1 & net$Target == gene2) | (net$Source == gene2 & net$Target == gene1))
-  samples=c()
-  if (edge & 'Samples' %in% colnames(net)) {
-    samples = getEdgeSamples(edge, net)
-    groups = rep('Out', length(colnames(ematrix)))
-    groups[samples] = "In"
-    groups = data.frame(groups)
-    row.names(groups) = colnames(ematrix)
-  }
+  groups = osa[c(field, field2)]
+  groups['Group'] = 'Out'
+  groups[ingroup, 'Group'] = 'In'
 
-  FigYa = plot2DPair(gene1, gene2, osa, net, ematrix, field, fig_title='(a)', show.legend=TRUE)
-  FigYc = plotGene(gene1, ematrix, osa, field2, colfield=field, show.legend=TRUE, fig_title='(c)', highlight=samples)
-  FigYd = plotGene(gene2, ematrix, osa, field2, colfield=field, show.legend=TRUE, fig_title='(d)', highlight=samples)
-
-
+  FigYa = plot2DPair(gene1, gene2, osa, ematrix, ingroup=ingroup, field = field, fig_title='(a)', show.legend=TRUE)
+  FigYc = plotGene(gene1, osa, ematrix, field=field2, ingroup=ingroup, colfield=field, show.legend=TRUE, fig_title='(c)')
+  FigYd = plotGene(gene2, osa, ematrix, field=field2, ingroup=ingroup, colfield=field, show.legend=TRUE, fig_title='(d)')
 
   expdata = merge(t(ematrix[c(gene1,gene2),]), groups, by="row.names")
-  cols = c('Sample', gene1, gene2, 'Edge')
+  cols = c('Sample', gene1, gene2, field, field2)
   colnames(expdata) = cols
-  expdata = expdata[, cols]
-  expdata = melt(expdata)
+  expdata = expdata[, c('Sample', gene1, gene2, field)]
+  mexpdata = melt(expdata, id.vars=c('Sample', field), variable.name='Gene', value.name='Expression' )
   colnames(expdata) = c('Sample', 'Edge', 'Gene', 'Expression')
-  FigYb <- ggplot(arrange(expdata, Edge), aes(x=Edge, y=Expression, fill=Edge)) +
+
+  FigYb <- ggplot(mexpdata, aes_string(x=field, y="Expression", fill=field)) +
     geom_violin(trim=FALSE, show.legend=FALSE) + ggtitle('(b)') +
     geom_boxplot(width=0.1, show.legend=FALSE) +
-    scale_fill_brewer(palette="Paired") +
+    scale_fill_brewer(palette="Dark2") +
     theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
     facet_grid(. ~ Gene)
 
@@ -1346,7 +1350,10 @@ plot2DPairReport <-function(gene1, gene2, osa, net, ematrix,
 
 #' Finds Linked communities in the network.
 #'
-#' This function generates three output files that it writes to the current
+#' This function uses the linked communities (linkcomm) method for module discover. This
+#' approaches finds modules of edges rather than modules of nodes.  This allows
+#' nodes to be in more than one module better supporting the concept of multifunctional
+#' genes. This function generates three output files that it writes to the current
 #' working directory.
 #'
 #' @param net
@@ -1365,21 +1372,28 @@ plot2DPairReport <-function(gene1, gene2, osa, net, ematrix,
 #'   Indicates if modules should be collapsed into meta-modules. If set to TRUE then
 #'   the linked communities returned are meta modules. Defaults to FALSE.
 #' @param th
-#'   A threshold for module merging. This parameter is used by `merge communities`. 
-#'   This is only used if `meta == TRUE`. Lower threshold results in merging
+#'   Specifies the Jaccard similarity score between two modules gene content in order
+#'   for those modules to be merged. Only applies if meta=TRUE. Lower threshold results in merging
 #'   being more common.
+#' @param min.verticies
+#'   If a network is disconnected then communities will be found in each subgraph
+#'   independnet of the others. This argument specifies the number of elements that
+#'   must exist in a subgraph for communities to be identified.
 #' @param ignore_inverse
 #'   If TRUE inverese edges are removed from the analysis. Defaults to TRUE
-#'   
+#' @param sim_col
+#'   The name of the column in the network data frame that contains the similarity
+#'   score.
 #' @return
 #'   The linked communities object.
 #' @export
 #'
 findLinkedCommunities = function(net, file_prefix="net", module_prefix = 'M',
-                                 hcmethod = 'complete', meta = TRUE, th = 0.5, ignore_inverse = TRUE) {
+                                 hcmethod = 'ward.D', meta = TRUE,
+                                 ignore_inverse = TRUE, th=0.5, min.vertices=10,
+                                 sim_col = 'Similarity_Score') {
   new_net = net
   new_net$Module = NA
-  sim_col = 'Similarity_Score'
 
   # If the user requested to ignore inverse correlation edges we'll take those out.
   if (ignore_inverse) {
@@ -1397,7 +1411,7 @@ findLinkedCommunities = function(net, file_prefix="net", module_prefix = 'M',
   # Linked community method doesn't do well with disconnected graphs. So, we want
   # to decompose the graph into its disjointed subgraphs.  If the callee doesn't want
   # modules to span inverse edges then remove those.
-  subg = decompose(g,  min.vertices = 30);
+  subg = decompose(g,  min.vertices = min.vertices);
 
   lcs = list()
 
@@ -1490,7 +1504,7 @@ findLinkedCommunities = function(net, file_prefix="net", module_prefix = 'M',
 #'   A list were each element of the list is the
 #'   set of nodes and edges of the merged clusters.
 
-mergeCommunities = function(lc, th){
+mergeCommunities = function(lc, th = 0.5){
 
   cedges = lc$clusters
   cnodes = lc$nodeclusters
@@ -1501,7 +1515,7 @@ mergeCommunities = function(lc, th){
 }
 
 #' The recursive merging function called by mergeCommunities().
-#' This is a helper function for the findLinkedCommunities() and mergeCommunities 
+#' This is a helper function for the findLinkedCommunities() and mergeCommunities
 #' functions and is not meant to be called on its own.
 mergeClusters = function(cedges, cnodes, th) {
   nclusters = length(cedges)
@@ -1534,7 +1548,7 @@ mergeClusters = function(cedges, cnodes, th) {
 
   # Now merge the best two clusters as long as the jaccard score is above
   # our given threshold.
-  if (best$ji[1] > th) {
+  if (best$ji[1] >= th) {
     i = best$i[1]
     j = best$j[1]
     cat(paste("Merging", i, 'and', j, 'from', nclusters, 'similarity:', sprintf("%.02f", best$ji[1]), "\r", sep=" "))
