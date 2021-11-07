@@ -234,12 +234,14 @@ saveConditionKINCNetwork = function(net, network_file, conditions=c(), filter='l
 KINCtoIgraph = function(net, add.attrs = FALSE) {
   g = graph.edgelist(as.matrix(net[, c('Source', 'Target')]), directed = FALSE)
 
-  attrs = colnames(net)
-  for (attr in attrs) {
-    if (attr == 'Source' | attr == 'Target') {
-      next
+  if (add.attrs == TRUE) {
+    attrs = colnames(net)
+    for (attr in attrs) {
+      if (attr == 'Source' | attr == 'Target') {
+        next
+      }
+      edge_attr(g, attr) = net[, attr]
     }
-    edge_attr(g, attr) = net[, attr]
   }
   return(g)
 }
@@ -1085,7 +1087,6 @@ plotGene = function(gene, osa, ematrix, field, ingroup=c(), colfield = field,
   if (!is.null(fig_title)) {
     expplot = expplot + ggtitle(fig_title)
   }
-  print(expplot)
   return(expplot)
 }
 
@@ -1157,7 +1158,6 @@ plot2DEdgeList = function(edge_indexes, osa, net, ematrix,
     if (!is.null(fig_title)) {
       coexpplot = coexpplot + ggtitle(fig_title)
     }
-    print(coexpplot)
 
     if (length(edge_indexes) == 1) {
       return(coexpplot)
@@ -1229,7 +1229,6 @@ plot2DPair = function(gene1, gene2, osa, ematrix, field, ingroup = c(),
     if (!is.null(fig_title)) {
       coexpplot = coexpplot + ggtitle(fig_title)
     }
-    print(coexpplot)
     return(coexpplot)
 }
 
@@ -1382,17 +1381,19 @@ plot2DPairReport <-function(gene1, gene2, osa, ematrix, field, ingroup = c(),
 #'   must exist in a subgraph for communities to be identified.
 #' @param ignore_inverse
 #'   If TRUE inverese edges are removed from the analysis. Defaults to TRUE
-#'
+#' @param sim_col
+#'   The name of the column in the network data frame that contains the similarity
+#'   score.
 #' @return
 #'   The linked communities object.
 #' @export
 #'
 findLinkedCommunities = function(net, file_prefix="net", module_prefix = 'M',
                                  hcmethod = 'ward.D', meta = TRUE,
-                                 ignore_inverse = TRUE, th=0.5, min.vertices=10) {
+                                 ignore_inverse = TRUE, th=0.5, min.vertices=10,
+                                 sim_col = 'Similarity_Score') {
   new_net = net
   new_net$Module = NA
-  sim_col = 'Similarity_Score'
 
   # If the user requested to ignore inverse correlation edges we'll take those out.
   if (ignore_inverse) {
