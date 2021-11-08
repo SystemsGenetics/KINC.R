@@ -1425,7 +1425,11 @@ findLinkedCommunities = function(net, file_prefix="net", module_prefix = 'M',
     subnet = as_edgelist(subg[[gi]])
 
     # Create the Link Community clusters.
-    lc = getLinkCommunities(subnet, hcmethod = hcmethod, removetrivial = FALSE, plot = FALSE)
+    lc = try(getLinkCommunities(subnet, hcmethod = hcmethod, removetrivial = FALSE, plot = FALSE), silent=TRUE)
+    if (typeof(lc) != "list") {
+      message(lc[1])
+      next
+    }
 
     # If the meta analysis was selected. Rather than use the cluster merging
     # function that comes with LCM we perform our own. This is because the
