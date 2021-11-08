@@ -76,7 +76,8 @@ loadKINCNetwork = function(network_file, nrows=-1, skip=0) {
                         "Cluster_Index" = "numeric", "Cluster_Size" = "numeric",
                         "Samples" = "character", "Test_Name" = "character" ,
                         "p_value" = "numeric", "r_squared" = "numeric", "rank" = "numeric",
-                        "WAnova_Max" = "numeric", "WAnova_Min" = "numeric", "MissingTtest" = "numeric")
+                        "WAnova_Max" = "numeric", "WAnova_Min" = "numeric",
+                        "MissingTtest" = "numeric", "Class" = "character")
     net = read.table(file=network_file, header = header, sep="\t", colClasses=colClasses, na.strings="nan", nrows=nrows, skip=skip)
   }
 
